@@ -4,12 +4,12 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
-// Ortam Değişkenleri
+// Ortam Değişkenleri (Render Environment Variables)
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'my_secure_token';
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const PORT = process.env.PORT || 10000;
 
-// 1. Webhook Doğrulama (GET)
+// 1. Webhook Doğrulama (GET) - Meta Paneli ile Bağlantı
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -22,32 +22,28 @@ app.get('/webhook', (req, res) => {
   return res.sendStatus(403);
 });
 
-// 2. Webhook Olay Dinleyici (POST)
+// 2. Canlı Mesaj Olayları (POST) - Gelen DM'leri Dinleme
 app.post('/webhook', async (req, res) => {
   const body = req.body;
 
   if (body.object === 'instagram' || body.object === 'page') {
+    // Meta'ya isteği aldığımızı bildirmek için anında 200 OK dönüyoruz
     res.status(200).send('EVENT_RECEIVED');
 
     for (const entry of body.entry) {
-      // Mesajın gönderildiği Instagram İşletme Hesabı ID'si (Örn: 17841441637097678)
-      const instagramAccountId = entry.id;
       const messagingEvent = entry.messaging ? entry.messaging[0] : null;
 
       if (messagingEvent && messagingEvent.message && messagingEvent.message.text) {
         const senderId = messagingEvent.sender.id;
         const receivedMessage = messagingEvent.message.text;
 
-        // Botun kendi attığı mesajları yoksay
-        if (senderId === instagramAccountId) continue;
-
         console.log(`💬 Gelen Mesaj [${senderId}]: ${receivedMessage}`);
 
         // Otomatik Yanıt Metni
         const replyText = `Merhaba! Mesajınızı aldım: "${receivedMessage}"`;
-        
-        // Yanıtı Instagram Graph API v21.0 formatına uygun gönder
-        await sendInstagramMessage(instagramAccountId, senderId, replyText);
+
+        // Yanıt Gönder
+        await sendInstagramMessage(senderId, replyText);
       }
     }
   } else {
@@ -55,11 +51,11 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// 3. Instagram Graph API Mesaj Gönderme Fonksiyonu
-async function sendInstagramMessage(instagramAccountId, recipientId, text) {
+// 3. Instagram / Messenger Graph API Yanıt Gönderme Fonksiyonu
+async function sendInstagramMessage(recipientId, text) {
   try {
-    // /me/ yerine doğrudan webhook paketinden gelen dinamik Instagram Account ID kullanılır
-    const url = `https://graph.facebook.com/v21.0/${instagramAccountId}/messages`;
+    // /me/messages adresi, PAGE_ACCESS_TOKEN bağlamında doğrudan mesajı iletir
+    const url = `https://graph.facebook.com/v21.0/me/messages`;
 
     const response = await axios.post(
       url,
@@ -68,10 +64,8 @@ async function sendInstagramMessage(instagramAccountId, recipientId, text) {
         message: { text: text },
       },
       {
-        params: {
-          access_token: PAGE_ACCESS_TOKEN
-        },
         headers: {
+          'Authorization': `Bearer ${PAGE_ACCESS_TOKEN}`,
           'Content-Type': 'application/json'
         }
       }
@@ -83,6 +77,10 @@ async function sendInstagramMessage(instagramAccountId, recipientId, text) {
   }
 }
 
-app.get('/', (req, res) => res.send('Bot Aktif!'));
+// Sağlık Kontrolü Endpoint'i
+app.get('/', (req, res) => res.send('Instagram Chatbot Webhook Servisi Aktif!'));
 
-app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} portunda dinleniyor...`));
+// Sunucuyu Başlat
+app.listen(PORT, () => {
+  console.log(`🚀 Sunucu ${PORT} portunda dinleniyor...`);
+});
