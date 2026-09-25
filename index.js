@@ -35,14 +35,20 @@ app.post('/webhook', async (req, res) => {
             for (const entry of body.entry) {
                 if (entry.messaging) {
                     for (const webhookEvent of entry.messaging) {
-                        // Güvenli kontrol: sender ve message nesnesi var mı?
-                        if (webhookEvent.sender && webhookEvent.sender.id && webhookEvent.message && webhookEvent.message.text) {
-                            const senderPsid = webhookEvent.sender.id;
+                        // Mesaj nesnesi var mı ve bu bir bildirim değil mesaj mı?
+                        if (webhookEvent.message && webhookEvent.message.text) {
+                            
+                            // Botun kendi attığı cevabı tekrar okumaması için echo kontrolü
+                            if (webhookEvent.message.is_echo === true) {
+                                console.log("[INFO]: Botun kendi yanıtı pas geçildi.");
+                                continue;
+                            }
+
+                            const senderPsid = webhookEvent.sender ? webhookEvent.sender.id : null;
                             const userMessage = webhookEvent.message.text;
 
-                            // Echo mesajı (botun kendi gönderdiği mesaj) değilse işle
-                            if (!webhookEvent.message.is_echo) {
-                                console.log(`[GELEN MESAJ]: ${userMessage}`);
+                            if (senderPsid) {
+                                console.log(`[GELEN MESAJ]: ${userMessage} (Kimden: ${senderPsid})`);
 
                                 // GuGu Clinic Özel Sistem Promptu
                                 const prompt = `
@@ -80,7 +86,7 @@ Kullanıcı Mesajı: "${userMessage}"
 
 async function sendInstagramMessage(senderPsid, text) {
     try {
-        await axios.post(
+        const res = await axios.post(
             `https://graph.facebook.com/v20.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
             {
                 recipient: { id: senderPsid },
@@ -89,7 +95,7 @@ async function sendInstagramMessage(senderPsid, text) {
         );
         console.log("[BAŞARILI]: Yanıt Instagram'a iletildi.");
     } catch (err) {
-        console.error("[GÖNDERME HATASI]:", err.response ? err.response.data : err.message);
+        console.error("[GÖNDERME HATASI]:", err.response ? JSON.stringify(err.response.data) : err.message);
     }
 }
 
