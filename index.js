@@ -35,23 +35,21 @@ app.post('/webhook', async (req, res) => {
             for (const entry of body.entry) {
                 if (entry.messaging) {
                     for (const webhookEvent of entry.messaging) {
-                        // Mesaj nesnesi var mı ve bu bir bildirim değil mesaj mı?
-                        if (webhookEvent.message && webhookEvent.message.text) {
-                            
-                            // Botun kendi attığı cevabı tekrar okumaması için echo kontrolü
-                            if (webhookEvent.message.is_echo === true) {
-                                console.log("[INFO]: Botun kendi yanıtı pas geçildi.");
-                                continue;
-                            }
+                        
+                        // Botun kendi gönderdiği yanıtları (echo) tekrar okumasını engelle
+                        if (webhookEvent.message && webhookEvent.message.is_echo) {
+                            continue;
+                        }
 
-                            const senderPsid = webhookEvent.sender ? webhookEvent.sender.id : null;
+                        // Güvenli Sender ve Message Kontrolü (Çökmeyi Engeller)
+                        if (webhookEvent.sender && webhookEvent.sender.id && webhookEvent.message && webhookEvent.message.text) {
+                            const senderPsid = webhookEvent.sender.id;
                             const userMessage = webhookEvent.message.text;
 
-                            if (senderPsid) {
-                                console.log(`[GELEN MESAJ]: ${userMessage} (Kimden: ${senderPsid})`);
+                            console.log(`[GELEN MESAJ]: ${userMessage} (Kimden: ${senderPsid})`);
 
-                                // GuGu Clinic Özel Sistem Promptu
-                                const prompt = `
+                            // GuGu Clinic Özel Sistem Promptu
+                            const prompt = `
 Sen GuGu Clinic için çalışan son derece nazik, profesyonel ve yönlendirici bir Instagram müşteri temsilcisisin.
 
 Aşağıdaki kurallara kesinlikle uyarak yanıt ver:
@@ -62,15 +60,14 @@ Aşağıdaki kurallara kesinlikle uyarak yanıt ver:
 5. Uygun yerlerde kibar bir ton ve 1-2 emoji kullan.
 
 Kullanıcı Mesajı: "${userMessage}"
-                                `;
+                            `;
 
-                                const result = await model.generateContent(prompt);
-                                const aiResponse = result.response.text();
-                                console.log(`[GEMİNİ YANITI]: ${aiResponse}`);
+                            const result = await model.generateContent(prompt);
+                            const aiResponse = result.response.text();
+                            console.log(`[GEMİNİ YANITI]: ${aiResponse}`);
 
-                                // Instagram'a Yanıt Gönder
-                                await sendInstagramMessage(senderPsid, aiResponse);
-                            }
+                            // Instagram'a Yanıt Gönder
+                            await sendInstagramMessage(senderPsid, aiResponse);
                         }
                     }
                 }
@@ -86,7 +83,7 @@ Kullanıcı Mesajı: "${userMessage}"
 
 async function sendInstagramMessage(senderPsid, text) {
     try {
-        const res = await axios.post(
+        await axios.post(
             `https://graph.facebook.com/v20.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
             {
                 recipient: { id: senderPsid },
