@@ -1,100 +1,95 @@
 const express = require('express');
 const axios = require('axios');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-
 const app = express();
+
+// Meta Webhook gelen JSON verisini okumak için zorunlu middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Gemini API Yapılandırması
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
+// Ortam değişkenlerinden yapılandırmaları alıyoruz
+const PORT = process.env.PORT || 10000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 
-// 1. Meta Webhook Doğrulama (GET)
+// 1. Kök Dizin Kontrolü (Render Health Check)
+app.get('/', (req, res) => {
+    res.send('Chatbot servisi aktif ve çalışıyor!');
+});
+
+// 2. Meta Webhook Doğrulama (GET /webhook)
 app.get('/webhook', (req, res) => {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    if (mode && token === VERIFY_TOKEN) {
-        console.log("Webhook başarıyla doğrulandı!");
-        res.status(200).send(challenge);
-    } else {
-        res.sendStatus(403);
+    if (mode && token) {
+        if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+            console.log('✅ Webhook başarıyla doğrulandı!');
+            return res.status(200).send(challenge);
+        } else {
+            console.error('❌ Doğrulama başarısız! Verify token eşleşmedi.');
+            return res.sendStatus(403);
+        }
     }
+    return res.sendStatus(400);
 });
 
-// 2. Gelen Instagram Mesajını İşleme (POST)
+// 3. Mesaj Yakalama ve Yanıtlama (POST /webhook)
 app.post('/webhook', async (req, res) => {
+    // Meta'ya isteğin ulaştığını anında bildiriyoruz (ZORUNLU - Aksi halde Meta bağlantıyı koparır)
+    res.status(200).send('EVENT_RECEIVED');
+
+    console.log("====================================");
+    console.log("📩 META'DAN GELEN HAM İSTEK:");
+    console.log(JSON.stringify(req.body, null, 2));
+    console.log("====================================");
+
     const body = req.body;
 
+    // Instagram mesaj nesnesi kontrolü
     if (body.object === 'instagram') {
-        try {
-            for (const entry of body.entry) {
-                if (entry.messaging) {
-                    for (const webhookEvent of entry.messaging) {
-                        
-                        // Botun kendi gönderdiği yanıtları (echo) tekrar okumasını engelle
-                        if (webhookEvent.message && webhookEvent.message.is_echo) {
-                            continue;
-                        }
+        body.entry?.forEach(async (entry) => {
+            const webhook_event = entry.messaging?.[0];
 
-                        // Güvenli Sender ve Message Kontrolü (Çökmeyi Engeller)
-                        if (webhookEvent.sender && webhookEvent.sender.id && webhookEvent.message && webhookEvent.message.text) {
-                            const senderPsid = webhookEvent.sender.id;
-                            const userMessage = webhookEvent.message.text;
+            if (webhook_event && webhook_event.message) {
+                const senderPsid = webhook_event.sender.id;
+                const messageText = webhook_event.message.text;
 
-                            console.log(`[GELEN MESAJ]: ${userMessage} (Kimden: ${senderPsid})`);
+                console.log(`💬 Gelen Mesaj [${senderPsid}]: ${messageText}`);
 
-                            // GuGu Clinic Özel Sistem Promptu
-                            const prompt = `
-Sen GuGu Clinic için çalışan son derece nazik, profesyonel ve yönlendirici bir Instagram müşteri temsilcisisin.
+                // Kendi attığı mesajları/eko yanıtları yoksay
+                if (webhook_event.message.is_echo) {
+                    console.log("İleti botun kendi mesajı, işlem yapılmadı.");
+                    return;
+                }
 
-Aşağıdaki kurallara kesinlikle uyarak yanıt ver:
-1. Yanıtların her zaman Türkçe, samimi ve kısa/öz olsun (Instagram DM formatına uygun).
-2. Kliniğin medikal estetik ve sağlık turizmi hizmetleri sunduğunu bil.
-3. Fiyat veya tedavi detayları sorulduğunda nazikçe bilgilendir ve detaylı yönlendirme için kullanıcıyı kliniğin iletişim hattına davet et.
-4. Tıbbi teşhis koyma veya kesin tedavi garantisi verme.
-5. Uygun yerlerde kibar bir ton ve 1-2 emoji kullan.
-
-Kullanıcı Mesajı: "${userMessage}"
-                            `;
-
-                            const result = await model.generateContent(prompt);
-                            const aiResponse = result.response.text();
-                            console.log(`[GEMİNİ YANITI]: ${aiResponse}`);
-
-                            // Instagram'a Yanıt Gönder
-                            await sendInstagramMessage(senderPsid, aiResponse);
-                        }
-                    }
+                // Basit Test Cevabı (Burayı daha sonra Gemini API ile bağlayabilirsiniz)
+                if (messageText) {
+                    await sendTextMessage(senderPsid, `Merhaba! Mesajınızı aldım: "${messageText}"`);
                 }
             }
-        } catch (error) {
-            console.error("İşleme hatası:", error);
-        }
-        res.status(200).send('EVENT_RECEIVED');
-    } else {
-        res.sendStatus(404);
+        });
     }
 });
 
-async function sendInstagramMessage(senderPsid, text) {
+// Instagram Send API Üzerinden Mesaj Gönderme Fonksiyonu
+async function sendTextMessage(senderPsid, text) {
     try {
-        await axios.post(
-            `https://graph.facebook.com/v20.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-            {
-                recipient: { id: senderPsid },
-                message: { text: text }
-            }
-        );
-        console.log("[BAŞARILI]: Yanıt Instagram'a iletildi.");
-    } catch (err) {
-        console.error("[GÖNDERME HATASI]:", err.response ? JSON.stringify(err.response.data) : err.message);
+        const url = `https://graph.facebook.com/v19.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+        
+        const requestBody = {
+            recipient: { id: senderPsid },
+            message: { text: text }
+        };
+
+        await axios.post(url, requestBody);
+        console.log(`🚀 Yanıt başarıyla gönderildi: "${text}"`);
+    } catch (error) {
+        console.error('❌ Mesaj gönderme hatası:', error.response ? error.response.data : error.message);
     }
 }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Sunucu ${PORT} portunda aktif...`));
+// Sunucuyu Başlatma
+app.listen(PORT, () => {
+    console.log(`🚀 Sunucu ${PORT} portunda aktif ve dinleniyor...`);
+});
