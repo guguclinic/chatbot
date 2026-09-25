@@ -48,10 +48,9 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// 3. Mesaj Gönderme Fonksiyonu (Universal Graph API Endpoint)
+// 3. Mesaj Gönderme Fonksiyonu
 async function sendInstagramMessage(recipientId, text) {
   try {
-    // me/messages endpoint'i doğrudan PAGE_ACCESS_TOKEN sahibinin bağlamında çalışır
     const url = `https://graph.facebook.com/v21.0/me/messages`;
 
     const response = await axios.post(
