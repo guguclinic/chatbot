@@ -30,23 +30,19 @@ app.post('/webhook', async (req, res) => {
     res.status(200).send('EVENT_RECEIVED');
 
     for (const entry of body.entry) {
-      // Instagram Hesap ID'si (Örn: 17841441637097678)
-      const instagramAccountId = entry.id;
       const messagingEvent = entry.messaging ? entry.messaging[0] : null;
 
       if (messagingEvent && messagingEvent.message && messagingEvent.message.text) {
+        // Gelen mesajdaki IGSID (Instagram Scoped ID)
         const senderId = messagingEvent.sender.id;
         const receivedMessage = messagingEvent.message.text;
 
-        // Botun kendi gönderdiği mesajları atla
-        if (senderId === instagramAccountId) continue;
-
-        console.log(`💬 Gelen Mesaj [${senderId}]: ${receivedMessage}`);
+        console.log(`💬 Gelen Mesaj [IGSID: ${senderId}]: ${receivedMessage}`);
 
         const replyText = `Merhaba! Mesajınızı aldım: "${receivedMessage}"`;
         
-        // Yanıtı Instagram ID'si üzerinden gönder
-        await sendInstagramMessage(instagramAccountId, senderId, replyText);
+        // Yanıt Gönder
+        await sendInstagramMessage(senderId, replyText);
       }
     }
   } else {
@@ -55,22 +51,20 @@ app.post('/webhook', async (req, res) => {
 });
 
 // 3. Instagram Graph API Mesaj Gönderme
-async function sendInstagramMessage(instagramAccountId, recipientId, text) {
+async function sendInstagramMessage(recipientId, text) {
   try {
-    // /me/ yerine dinamik instagramAccountId kullanıyoruz
-    const url = `https://graph.facebook.com/v21.0/${instagramAccountId}/messages`;
+    // Meta dokümantasyonuna uygun me/messages endpoint'i
+    const url = `https://graph.facebook.com/v21.0/me/messages`;
 
     const response = await axios.post(
       url,
       {
-        recipient: { id: recipientId },
+        recipient: { id: recipientId }, // Webhook'tan gelen IGSID
         message: { text: text },
       },
       {
-        params: {
-          access_token: PAGE_ACCESS_TOKEN
-        },
         headers: {
+          'Authorization': `Bearer ${PAGE_ACCESS_TOKEN}`,
           'Content-Type': 'application/json'
         }
       }
