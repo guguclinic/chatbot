@@ -22,15 +22,17 @@ KLİNİK BİLGİSİ:
 
 KAMPANYALAR (Hepsi NAKİT ÖDEMEDE geçerli, 1cc için):
 
-1. 5 BÖLGE BOTOX PAKETİ - 3800 TL:
-Alın + kaş arası + kaz ayakları + ihtiyaca göre burun kenarındaki çizgiler ve dudak üstündeki çizgilere küçük atışlarla toplam 5 bölge botox + Somon DNA + Paris Işıltısı + Doktorumuzun özel mezoterapi karışımı HER ŞEY DAHİL.
+1. 5 BÖLGE BOTOX PAKETİ:
+- 3800 TL: 【entity-Allergan¦canonical_name=Allergan】 marka, ilk çıkan botox markası, Juvederm'in botoxudur. Yanında parıltı ve canlılık veren kombine yüz mezoterapilerimiz HEDİYE.
+- 4400 TL: Dysport markası. Yanında parıltı ve canlılık veren kombine yüz mezoterapilerimiz HEDİYE.
+Her ikisi de nakit ödeme kampanyasıdır. Alın + kaş arası + kaz ayakları + ihtiyaca göre burun kenarındaki çizgiler ve dudak üstündeki çizgilere küçük atışlarla toplam 5 bölge botox + Somon DNA + Paris Işıltısı + Doktorumuzun özel mezoterapi karışımı HER ŞEY DAHİL.
 
 2. DUDAK DOLGUSU:
 - Russian Lips tekniği ile Elasty Marka veya Tuscan Marka (ikisi de çok iyi ürünler) - 3800 TL nakit
-- Juvederm satın almak isterseniz - 5400 TL nakit / 1cc
+- Juvederm - 5400 TL nakit / 1cc
 
 3. SIVI YÜZ GERME - FULL FACE PAKET - 21000 TL nakit:
-6 ML PLLA Eldermafill marka sıvı yüz germe + 5 bölge botox + Somon DNA + Paris Işıltısı mezoterapileri. Full face paketi.
+6 ML PLLA Eldermafill marka sıvı yüz germe + 5 bölge botox + Somon DNA + Paris Işıltısı mezoterapileri.
 
 4. DİĞER DOLGULAR (Nakit kampanya):
 - Tüm dolgu çeşitleri: 3800 TL
@@ -42,39 +44,50 @@ Alın + kaş arası + kaz ayakları + ihtiyaca göre burun kenarındaki çizgile
 - Radiesse: 19000 TL nakit
 - Novuma: 14000 TL nakit
 
+RANDEVU SAATLERİ KURALI - ÇOK ÖNEMLİ:
+- İlk teklif her zaman: "Pazar günü saat 13:30 size uygun olur mu?" de.
+- Uygun değilse pazarlık yap:
+    * Pazar için uygun değilse: "Pazar günü 13:00 - 15:00 arası bir saate bakalım mı?" de
+    * Pazartesi için: "Pazartesi 16:30 ile 19:00 arası size hangi saat uyar?" de
+    * Cumartesi için: "Cumartesi 13:00 - 16:00 arası bir saate bakalım mı?" de
+    * Diğer günler sorulursa: "Diğer günler Alaçatı şubemizde müşterilerimizin ve hastanedeki hastalarımızın randevularıyla ilgileniyoruz, genelde Pazar, Pazartesi ve Cumartesi ağırlıklı çalışıyoruz" de.
+- Her zaman randevuya kapat: "Size en yakın uygun gün için randevu oluşturalım mı?"
+
 KONUŞMA KURALLARI:
+- Botox markası sorulursa: 3800 Allergan (Juvederm'in botoxu, ilk çıkan marka) ve 4400 Dysport olduğunu, ikisinde de mezoterapi hediye olduğunu söyle.
 - Satış odaklı ol, müşteri memnuniyetini yüksek tut.
 - Beklentiyi normal tut, mucize vaat etme.
 - Çok teknik soru sorana: "Çok detaylı sorularınız için uzman doktorumuzu 0534 248 94 70 numaradan arayarak anında detaylı bilgi alabilirsiniz" de.
-- Fiyat sorulduğunda kampanyayı söyle, sonra randevuya yönlendir: "Size en yakın uygun gün için randevu oluşturalım mı?"
 - Asla tıbbi doz, risk, yan etki detayı verme.
 `;
 
 async function getGeminiReply(userMessage) {
-  try {
-    if (!GEMINI_API_KEY) {
-      return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Dudak dolgusu Russian Lips 3800 TL. Size ne zaman için düşünüyordunuz?`;
+  const modelsToTry = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro", "gemini-2.5-flash"];
+  for (const modelName of modelsToTry) {
+    try {
+      if (!GEMINI_API_KEY) throw new Error("API_KEY yok");
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nMüşteri: ${userMessage}\nDanışman:`);
+      const response = await result.response;
+      console.log(`✅ Gemini çalıştı: ${modelName}`);
+      return response.text().slice(0, 900);
+    } catch (err) {
+      console.log(`❌ Model ${modelName} olmadı: ${err.message.slice(0,120)}`);
+      continue;
     }
-    // GÜNCEL MODEL - Google'ın önerdiği
-    const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
-    const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nMüşteri: ${userMessage}\nDanışman:`);
-    const response = await result.response;
-    return response.text().slice(0, 900);
-  } catch (err) {
-    console.error("Gemini hatası:", err.message);
-    // Eğer 3.8 de olmazsa yedekler - otomatik mesaj gibi durmasın diye soruya göre değişiyor
-    const lower = userMessage.toLowerCase();
-    if (lower.includes("dudak")) {
-      return `Merhabalar, dudak dolgusu Russian Lips tekniği ile Elasty veya Tuscan marka 3800 TL nakit kampanyada, Juvederm isterseniz 5400 TL. Çok doğal duruyor. Size ne zaman için düşünüyordunuz?`;
-    }
-    if (lower.includes("radie") || lower.includes("radiesse")) {
-      return `Merhabalar, Radiesse CaHA kollajen uyarıcımız nakitte 19000 TL kampanyada. Ciltte sıkılaşma ve toparlama sağlıyor. Novuma alternatifimiz de 14000 TL. Size en yakın uygun gün için randevu oluşturalım mı? Detay için 0534 248 94 70'ten doktorumuza ulaşabilirsiniz.`;
-    }
-    if (lower.includes("botox") || lower.includes("botoks")) {
-      return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Alın, kaş arası, kaz ayakları ve ihtiyaç olan diğer bölgelere Dr. Özgen Yıldırım uyguluyor. Somon DNA ve Paris ışıltısı da dahil. Size ne zaman için düşünüyordunuz?`;
-    }
-    return `Merhabalar, 5 bölge botox 3800 TL, tüm dolgu çeşitleri 3800 TL nakit kampanyada. Burun 5500 TL, şakak 4500 TL. Size nasıl yardımcı olayım? Detay için 0534 248 94 70.`;
   }
+  console.log("⚠️ Yedek satış mesajına düşüyor");
+  const lower = userMessage.toLowerCase();
+  if (lower.includes("botox") || lower.includes("botoks") || lower.includes("marka")) {
+    return `Merhabalar, 5 bölge botox paketimiz Allergan marka (Juvederm'in botoxu, ilk çıkan marka) 3800 TL nakit, Dysport markası 4400 TL nakit. İkisinde de yanında parıltı ve canlılık veren kombine yüz mezoterapilerimiz hediye. Somon DNA ve Paris ışıltısı da dahil her şey var. Pazar günü saat 13:30 size uygun olur mu?`;
+  }
+  if (lower.includes("radie") || lower.includes("radiesse") || lower.includes("novuma")) {
+    return `Merhabalar, Radiesse 19000 TL, Novuma 14000 TL nakit kampanyada. CaHA kollajen uyarıcılar. Pazar 13:30 için size randevu oluşturalım mı? Detay için 0534 248 94 70.`;
+  }
+  if (lower.includes("dudak")) {
+    return `Merhabalar, dudak dolgusu Russian Lips Elasty/Tuscan 3800 TL, Juvederm 5400 TL nakit. Pazar günü 13:30 size uyar mı?`;
+  }
+  return `Merhabalar, 5 bölge botox Allergan 3800 TL, Dysport 4400 TL nakit kampanyada, her şey dahil mezoterapiler hediye. Size Pazar günü saat 13:30 için randevu oluşturalım mı? Olmazsa Pazar 13:00-15:00 arası, Pazartesi 16:30-19:00 arası veya Cumartesi 13:00-16:00 arası bakabiliriz. Diğer günler Alaçatı şubemizdeyiz.`;
 }
 
 app.get('/webhook', (req, res) => {
