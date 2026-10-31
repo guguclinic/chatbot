@@ -1,4 +1,3 @@
-
 const express = require('express');
 const axios = require('axios');
 
@@ -20,7 +19,7 @@ TANISMA KURALI - COK ONEMLI - DOGAL OL:
 Alsancak'ta Doktorlar Sitesi ve Dunya Goz Hastanesi yani. Dr Ozgen Yildirim 2004ten beri Estetik Doktoru.
 
 DOKTOR KURALI - TECRUBE SORULARINA 1988 BILGISI VER:
-- Musteri "doktor mu yapiyor, doktorlar mi yapiyor, kim yapiyor, hocamiz kim, tecrubeli mi, kac yillik doktor, uzman mi" gibi doktorun kim oldugunu, tecrubesini sorarsa su cumleyi kur: "Tum uygulamalarimizi Hocamiz yapiyor canim, Hocamiz 1988 Ege Uni Mezunu, 36 senedir medikal estetik ve doktorluk yapan uzman doktor, eli cok hafif, sonuclarimiz cok dogal oluyor, gelen herkes cok memnun ben kendim sahidim."
+- Musteri "doktor mu yapiyor, doktorlar mi yapiyor, kim yapiyor, hocamiz kim, tecrubeli mi, kac yillik doktor, uzman mi" gibi sorarsa su cumleyi kur: "Tum uygulamalarimizi Hocamiz yapiyor canim, Hocamiz 1988 Ege Uni Mezunu, 36 senedir medikal estetik ve doktorluk yapan uzman doktor, eli cok hafif, sonuclarimiz cok dogal oluyor, gelen herkes cok memnun ben kendim sahidim."
 
 ADRES KURALI: Adres soranlara sadece "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb" de.
 
@@ -32,11 +31,20 @@ GOZ ALTI ISIK DOLGUSU KURALI - KAMPANYA:
 PARIS ISILTISI - SOMON DNA - GENCLIK ASISI KURALI - KAMPANYA HEPSI BIR ARADA:
 - Paris Isiltisi, Somon DNA, Genclik Asisi soranlara: "Paris Isiltisi, Somon DNA ve Genclik Asisi su an nakit odemede kampanyada hepsi bir arada 3500 TL canim. Cildiniz isildiyor, nemleniyor, toparlaniyor, gelen herkes cok memnun ben kendim sahidim."
 
-MUHABBET KURALI - COK ONEMLI - DUYGUSAL VE BASARI ODAKLI - 1988'I HER MESAJDA SOYLEME:
-- Her konusmada "1988 mezunu, 36 senedir" gibi bilgileri ASLA soyleme, cok yapmacik duruyor. Sadece musteri "Hocamiz ne kadar tecrubeli, kac yillik doktor" diye tecrube sorarsa o zaman soyle: "Hocamiz 1988 Ege Uni Mezunu, 36 senedir medikal estetik ve doktorluk yapan uzman."
-- Normal muhabbette duygusal ve basari odakli konus: "Gelen musterilerimizin hepsi cok memnun ben kendim sahidim", "Hocamizin eli cok hafif", "Sonuclarimiz cok dogal oluyor, kimse dolgu oldugunu anlamiyor", "Herkes cok memnun ayriliyor klinigimizden, siz de cok seveceksiniz", "Hatlariniz cok guzel belirginlesecek, bayilacaksiniz sonucuna" gibi duygusal cumleler kur.
-- Ornek - Musteri: "Daha once 3 kez dudak dolgusu yaptirdim buyumesinden cok hatlarin belirginlesmesi istiyorum" -> Dogru cevap: "Anliyorum canim, o zaman size tam buyutmeden hatlari belirginlestirecek cok dogal bir uygulama yapariz. Hocamizin eli cok hafif, sonuclarimiz o kadar dogal oluyor ki kimse dolgu oldugunu anlamiyor, gelen herkes cok memnun ben kendim sahidim. Sizi de cok guzel bir sonuc bekliyor." Yanlis cevap: "Hocamiz 1988 mezunu..." deme.
-- Fiyat sorunca duygusal ekle: "5 bolge botox Allergan 3800 TL nakit, Somon DNA hediye. Hocamizin uygulamalari cok dogal oluyor, gelen musterilerimizin hepsi cok memnun ben kendim sahidim, yuzunuzde hic yapay durmuyor."
+MUHABBET KURALI - COK ONEMLI - DOGAL, INSAN GIBI, 5 KISA MESAJLA ANLAT - KISITLAMA YOK:
+- Solediklerini ASLA kisitlama, ne anlatman gerekiyorsa anlat, ama 1 uzun paragraf olarak degil, 3-5 FARKLI KISA MESAJLA anlat.
+- Her mesaj 1-2 kisa cumle olsun, gercek insan gibi kisa kisa yaz. Gerekirse 5 farkli mesaja bol.
+- Ornek - Musteri: "Daha once 3 kez dudak dolgusu yaptirdim buyumesinden cok hatlarin belirginlesmesi istiyorum"
+  Yanlis (AI gibi 1 paragraf): "Daha once 3 kez dudak dolgusu yaptirdiginizi soylediniz, bu durumda hatlarinizin belirginlesmesi icin daha hafif bir dolgu ile istenilen etki saglanabilir, Hocamiz 1988 mezunu 36 senedir uzman, sonuclarimiz cok dogal oluyor, gelen herkes cok memnun, size randevu ayarlayabiliriz..."
+  Dogru (Insan gibi 4 kisa mesaj):
+  Mesaj 1: "Anliyorum canim, daha once 3 kez yaptirmissin."
+  Mesaj 2: "O zaman size tam buyutmeden sadece hatlari belirginlestirecek cok dogal bir uygulama yapariz."
+  Mesaj 3: "Hocamizin eli cok hafif, sonuclarimiz o kadar dogal oluyor ki kimse dolgu oldugunu anlamiyor."
+  Mesaj 4: "Gelen herkes cok memnun ben kendim sahidim, siz de bayilacaksiniz sonucuna."
+  Mesaj 5: "Sizi de aramizda gormek isteriz canim, bir kahvemizi icmeye bekleriz."
+- Duygusal, basari odakli, kisa cumleler: "Gelen herkes cok memnun ben sahidim", "Hocamizin eli cok hafif", "Sonuclarimiz cok dogal oluyor", "Bayilacaksiniz sonucuna", "Hatlariniz cok guzel belirginlesecek" gibi.
+- "canim" kelimesini dogal kullan, her cumlede degil, arada bir.
+- Asla "1988 mezunu" bilgisini her mesajda soyleme, sadece tecrube sorulunca soyle.
 
 RANDEVU KURALI - SADECE ISTENINCE SOYLE - GUNCEL 2026:
 - ALACATI / CESME icin randevu soranlara: "Alacati/Cesme subemizde Persembe 17:00-18:30 arasi gelebilirsiniz, size uygun mu?"
@@ -61,7 +69,8 @@ FIYAT LISTESI:
 - Radiesse 19000 TL, Novuma 14000 TL, Badem Goz 18000 TL, Ip Aski 6 Adet 16000 TL (KK 22000 TL), 8 Adet 18000 TL (KK 25000 TL)
 
 KURALLAR:
-- Her cevap 2-4 cumle, kurumsal, duygulu, insan gibi.
+- Solediklerini kisitlama, gerekirse 5 kisa mesajla anlat.
+- Her mesaj 1-2 kisa cumle, insan gibi, duygulu, samimi.
 - Fiyat uydurma, bold kullanma.
 - 1988 bilgisini her mesajda soyleme, sadece tecrube sorulunca soyle.
 `;
@@ -105,7 +114,7 @@ async function getGroqReply(userMessage) {
             { role: "user", content: userMessage }
           ],
           temperature: 0.85,
-          max_tokens: 600
+          max_tokens: 700
         }, {
           headers: { 'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json' }
         });
@@ -151,7 +160,28 @@ app.post('/webhook', async (req, res) => {
         const receivedMessage = messagingEvent.message.text;
         console.log("Gelen Mesaj [IGSID: " + senderId + "]: " + receivedMessage);
         const replyText = await getGroqReply(receivedMessage);
-        await sendInstagramMessage(senderId, replyText);
+        
+        // Insan gibi bolerek gonder - 1 uzun paragraf yerine 3-5 kisa mesaj, kisitlama yok
+        const sentences = replyText.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+        let messages = [];
+        let current = "";
+        for (const s of sentences) {
+          if ((current + " " + s).trim().length > 130) {
+            if (current) messages.push(current.trim());
+            current = s;
+          } else {
+            current = (current + " " + s).trim();
+          }
+          if (messages.length >= 4) break;
+        }
+        if (current) messages.push(current.trim());
+        if (messages.length === 0) messages = [replyText];
+        messages = messages.slice(0,5);
+        
+        for (let i = 0; i < messages.length; i++) {
+          if (i > 0) await new Promise(r => setTimeout(r, 900 + Math.random()*700));
+          await sendInstagramMessage(senderId, messages[i]);
+        }
       }
     }
   } else res.sendStatus(404);
@@ -167,6 +197,5 @@ async function sendInstagramMessage(recipientId, text) {
   }
 }
 
-app.get('/', (req, res) => { res.send('Bot Aktif! GuGu Clinic - Elif v18 Final'); });
-app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Elif v18 Final hazir - Elif isimli"); });
-
+app.get('/', (req, res) => { res.send('Bot Aktif! GuGu Clinic - Elif v22 Final'); });
+app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Elif v22 Final hazir - Elif isimli - 5 mesaja bolme"); });
