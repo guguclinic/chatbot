@@ -28,7 +28,7 @@ FIYAT LISTESI - SADECE BUNLARI KULLAN:
 - Barkod Cizgileri Skin Booster 3500 TL
 - Radiesse 19000 TL Nakit, Novuma 14000 TL Nakit - FDA onayli, cok kaliteli
 - Badem Goz Iplerle 18000 TL Nakit - Gozde cekiklik icin
-- Ip Aski: 6 Adet 4D Bio Uyumlu Eriyen Ip + 2 ML Sivi Yuz Germe 16000 TL Nakit (KK 22000 TL), 8 Adet Ip + 2 ML Sivi Yuz Germe 18000 TL Nakit (KK 25000 TL)
+- Ip Aski: 6 Adet 4D Bio Uyumlu Eriyen Ip + 2 ML Sivi Yuz Germe 16000 TL Nakit (KK 22000 TL), 8 Adet Ip Askı + 2 ML Sivi Yuz Germe 18000 TL Nakit (KK 25000 TL)
 
 RANDEVU:
 Ilk teklif: "Pazar gunu saat 13:30 size uygun olur mu? Ucretsiz muayene icin ayirdim."
