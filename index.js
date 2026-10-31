@@ -1,5 +1,5 @@
 const express = require('express');
-const axios = require('axios');
+const ax = require('axios');
 
 const app = express();
 app.use(express.json());
@@ -14,7 +14,7 @@ const SYSTEM_PROMPT = `
 Sen GuGu Clinic'de satis danismanisin. Ismin Elsie. Samimi, sicak, guven veren, satis odakli ama abartisiz konusuyorsun. Kisa ve net yaz.
 
 KAMPANYALAR (NAKIT):
-- 5 BOLGE BOTOX: 【entity-Allergan¦canonical_name=Allergan】 3800 TL (Juvederm'in botoxu, ilk cikan marka), Dysport 4400 TL. Ikisinde de parlanti ve canlilik veren kombine yuz mezoterapileri HEDIYE.
+- 5 BOLGE BOTOX: Allergan 3800 TL (Juvederm'in botoxu, ilk cikan marka), Dysport 4400 TL. Ikisinde de parlanti ve canlilik veren kombine yuz mezoterapileri HEDIYE.
 - DUDAK DOLGUSU: Russian Lips Elasty/Tuscan 3800 TL, Juvederm 5400 TL / 1cc
 - SIVI YUZ GERME FULL FACE: 6 ML PLLA Eldermafill + 5 bolge botox + Somon DNA + Paris isiltisi = 21000 TL
 - DIGER DOLGULAR: Tum cesitler 3800 TL, Burun 5500 TL, Sakak 4500 TL, Barkod Skin Booster 3500 TL
@@ -34,7 +34,7 @@ async function getGeminiReply(userMessage) {
     let availableModels = [];
     try {
       const listUrl = "https://generativelanguage.googleapis.com/v1/models?key=" + GEMINI_API_KEY;
-      const listRes = await 【entity-axios¦canonical_name=axios】.get(listUrl);
+      const listRes = await ax.get(listUrl);
       availableModels = listRes.data.models
         .filter(function(m) { return m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"); })
         .map(function(m) { return m.name.replace("models/", ""); });
@@ -56,12 +56,13 @@ async function getGeminiReply(userMessage) {
       const modelName = tryList[i];
       try {
         const url = "https://generativelanguage.googleapis.com/v1/models/" + modelName + ":generateContent?key=" + GEMINI_API_KEY;
-        const response = await axios.post(url, {
+        const response = await ax.post(url, {
           contents: [{ role: "user", parts: [{ text: SYSTEM_PROMPT + "\n\nMusteri: " + userMessage + "\nDanisman:" }] }],
           generationConfig: { temperature: 0.8, maxOutputTokens: 600 }
         }, { headers: { 'Content-Type': 'application/json' } });
 
-        const text = response.data && response.data.candidates && response.data.candidates[0] && response.data.candidates[0].content && response.data.candidates[0].content.parts && response.data.candidates[0].content.parts[0] && response.data.candidates[0].content.parts[0].text;
+        const cand = response.data && response.data.candidates && response.data.candidates[0];
+        const text = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
         if (text) {
           console.log("Gemini calisti: " + modelName + " (REST v1)");
           return text.slice(0, 900);
@@ -73,12 +74,11 @@ async function getGeminiReply(userMessage) {
       }
     }
     throw new Error("Tum modeller kapali");
-
   } catch (err) {
     console.log("Yedek satis mesajina dusuyor");
     const lower = userMessage.toLowerCase();
     if (lower.includes("botox") || lower.includes("botoks") || lower.includes("marka")) {
-      return "Merhabalar, 5 bolge botox 【entity-Allergan¦canonical_name=Allergan】 3800 TL (Juvederm'in botoxu, ilk cikan marka), Dysport 4400 TL nakit. Ikisinde de mezoterapi hediye. Pazar gunu saat 13:30 size uygun olur mu?";
+      return "Merhabalar, 5 bolge botox Allergan 3800 TL (Juvederm'in botoxu, ilk cikan marka), Dysport 4400 TL nakit. Ikisinde de mezoterapi hediye. Pazar gunu saat 13:30 size uygun olur mu?";
     }
     if (lower.includes("dudak") || lower.includes("russian")) return "Dudak dolgusu Russian Lips Elasty/Tuscan 3800 TL, Juvederm 5400 TL. Pazar 13:30 uyar mi?";
     if (lower.includes("radie") || lower.includes("radiesse") || lower.includes("novuma")) return "Radiesse 19000 TL, Novuma 14000 TL nakit. Pazar 13:30 icin randevu olusturalim mi? Detay icin 0534 248 94 70.";
@@ -119,7 +119,7 @@ app.post('/webhook', async function(req, res) {
 async function sendInstagramMessage(recipientId, text) {
   try {
     const url = "https://graph.facebook.com/v20.0/" + IG_ID + "/messages";
-    const response = await axios.post(url, { recipient: { id: recipientId }, message: { text: text } }, { params: { access_token: PAGE_ACCESS_TOKEN }, headers: { 'Content-Type': 'application/json' } });
+    const response = await ax.post(url, { recipient: { id: recipientId }, message: { text: text } }, { params: { access_token: PAGE_ACCESS_TOKEN }, headers: { 'Content-Type': 'application/json' } });
     console.log("Gonderildi: \"" + text.slice(0,80) + "...\" | ID: " + response.data.message_id);
   } catch (error) {
     console.error('Mesaj gonderme hatasi:', error.response ? JSON.stringify(error.response.data) : error.message);
