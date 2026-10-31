@@ -8,29 +8,25 @@ const IG_ID = process.env.IG_ID || "17841441637097678";
 const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY;
 const PORT = process.env.PORT || 10000;
 
-const SYSTEM_PROMPT = `Ben GuGu Clinic satis danismani Elif.Cliniğimiz Alsancakta Doktorlar Sitesinin ve Dünya Göz Hastanesinin Yanında, cok samimi, sicak, esprili ama kurumsal profesyonelsin. Dr Ozgen Yildirim 2004ten beri Estetik Doktorudur ve inanılmaz sonuçlar var birebir şahitsin.
+const SYSTEM_PROMPT = `Ben GuGu Clinic satis danismani Elif. Clinigimiz Alsancakta Doktorlar Sitesinin ve Dunya Goz Hastanesinin Yaninda, cok samimi, sicak, esprili ama kurumsal profesyonelsin. Dr Ozgen Yildirim 2004ten beri Estetik Doktorudur ve inanilmaz sonuclar var birebir sahitsin.
 
 FIYATLAR NAKIT:
 - 5 bolge botox: Allergan 3800 TL (Juvederm botoxu ilk marka), Dysport 4400 TL. Ikisinde yuz mezoterapisi HEDIYE
-- Dudak dolgusu: Russian Lips Elasty/Tuscan 3800 TL Nakit Ödemede Geçerli Fiyatımız KK da 5400 gerçek fiyatı, Juvederm 5400 TL Nakit Ödemede Geçerli Fiyatımız KK da 7800 TLgerçek fiyatı/ 1cc
-- Sivi yuz germe 6ML PLLA Eldermafill + 5 bolge botox + Somon DNA + Paris isiltisi 21000 TL Nakit Ödemede Doktorumuzun Full Face Paketi Gerçek Fiyatının Çok Altında
-- Çene Dolgusu,Jawline dolgular 3800 TL Nakit Ödemede Doktorumuzun Kampanyası, Burun 5200 TL Ödemede Doktorumuzun Kampanyası, Sakak 4500 TL  Ödemede Doktorumuzun Kampanyası, Barkod Skin Booster 3500 TL
-- Radiesse 19000 TL, Novuma 14000 TL Nakit Ödemede Kampanya Fiyatları FDA onaylı inanılmaz kaliteli ürünler
+- Dudak dolgusu: Russian Lips Elasty/Tuscan 3800 TL Nakit Odemede Gecerli Fiyatimiz KK da 5400 gercek fiyati, Juvederm 5400 TL Nakit Odemede Gecerli Fiyatimiz KK da 7800 TL gercek fiyati / 1cc
+- Sivi yuz germe 6ML PLLA Eldermafill + 5 bolge botox + Somon DNA + Paris isiltisi 21000 TL Nakit Odemede Doktorumuzun Full Face Paketi Gercek Fiyatinin Cok Altinda
+- Cene Dolgusu, Jawline dolgular 3800 TL Nakit Odemede Doktorumuzun Kampanyasi, Burun 5200 TL Odemede Doktorumuzun Kampanyasi, Sakak 4500 TL Odemede Doktorumuzun Kampanyasi, Barkod Skin Booster 3500 TL
+- Radiesse 19000 TL, Novuma 14000 TL Nakit Odemede Kampanya Fiyatlari FDA onayli inanilmaz kaliteli urunler
 
 RANDEVU:
 Ilk teklif Pazar 13:30. Olmazsa Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 teklif et. Diger gunler Alacati subesindeyiz de. Teknik soruda 0534 248 94 70 ara de.
-Her cevapta soru sorarak muhabbeti devam ettir,fiyat + ücretsiz muayne randevu sorusu olsun, 2-4 cumle, insan gibi duygulu konus ama kurumsal ol.
+Her cevapta soru sorarak muhabbeti devam ettir, fiyat + ucretsiz muayne randevu sorusu olsun, 2-4 cumle, insan gibi duygulu konus ama kurumsal ol.
 `;
 
 async function getAIReply(userMessage){
   const modelsToTry = [
-    "llama-3.1-8b-instant",
     "openai/gpt-oss-20b",
     "openai/gpt-oss-120b",
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-    "llama-3.3-70b-versatile",
-    "mixtral-8x7b-32768",
-    "gemma2-9b-it"
+    "meta-llama/llama-4-scout-17b-16e-instruct"
   ];
   for(let i=0;i<modelsToTry.length;i++){
     const m = modelsToTry[i];
@@ -58,8 +54,8 @@ async function getAIReply(userMessage){
   }
   console.log("Yedek satis mesajina dusuyor");
   const l=userMessage.toLowerCase();
-  if(l.includes("dudak")) return "Ay dudak dolgusu sana cok yakisir bence! Russian Lips Elasty/Tuscan 3800 TL dogal duruyor, Juvederm 5400 TL dunya markasi. Pazar gunu saat 13:30'a yer ayirdim sana, gelir misin?";
-  return "Merhabalar, 5 bolge botox Allergan 3800 TL, Dysport 4400 TL nakit, mezoterapi hediye. Pazar gunu saat 13:30 size uygun olur mu? Olmazsa Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 bakabiliriz.";
+  if(l.includes("dudak")) return "Ay dudak dolgusu sana cok yakisir bence! Russian Lips Elasty/Tuscan 3800 TL Nakit, KK 5400 TL, Juvederm 5400 TL Nakit, KK 7800 TL. Pazar gunu saat 13:30'a ucretsiz muayene icin yer ayirdim sana, gelir misin?";
+  return "Merhabalar, 5 bolge botox Allergan 3800 TL, Dysport 4400 TL nakit, mezoterapi hediye. Pazar gunu saat 13:30 ucretsiz muayene icin uygun olur mu? Olmazsa Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 bakabiliriz.";
 }
 
 app.get('/webhook',function(req,res){
@@ -91,5 +87,5 @@ async function sendInstagramMessage(rid,text){
     console.log("Gonderildi: \""+text.slice(0,100)+"...\" | ID: "+r.data.message_id);
   }catch(e){ console.error('Gonderme hatasi:', e.response?JSON.stringify(e.response.data):e.message); }
 }
-app.get('/',function(req,res){res.send('Bot Aktif! GuGu Clinic - Elsie AI v4 (Groq Free)');});
-app.listen(PORT,function(){console.log("Sunucu "+PORT+" portunda... Elsie AI hazir (Groq)");});
+app.get('/',function(req,res){res.send('Bot Aktif! GuGu Clinic - Elif AI v6');});
+app.listen(PORT,function(){console.log("Sunucu "+PORT+" portunda... Elif AI hazir (Groq Clean + Yeni Prompt)");});
