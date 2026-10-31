@@ -67,6 +67,9 @@ FIYAT LISTESI:
 - Paris Isiltisi + Somon DNA + Genclik Asisi: Hepsi Bir Arada Nakit 3500 TL KAMPANYA
 - Sivi Yuz Germe Full Face: 21000 TL Nakit, Cene/Jawline 3800 TL, Burun 5200 TL, Sakak 4500 TL, Skin Booster 3500 TL
 - Radiesse 19000 TL, Novuma 14000 TL, Badem Goz 18000 TL, Ip Aski 6 Adet 16000 TL (KK 22000 TL), 8 Adet 18000 TL (KK 25000 TL)
+- Jawline Dolgu 1 cc 3800 Nakit Ödemede (KK 5400 TL)
+- Jalupro 7000 TL Nakit Ödemede 
+- H100 6500 TL Nakit Ödemede
 
 KURALLAR:
 - Solediklerini kisitlama, gerekirse 5 kisa mesajla anlat.
