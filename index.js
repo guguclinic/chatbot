@@ -5,17 +5,14 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const app = express();
 app.use(express.json());
 
-// Ortam Değişkenleri
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'my_secure_token';
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const IG_ID = process.env.IG_ID || "17841441637097678";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const PORT = process.env.PORT || 10000;
 
-// Gemini Kurulumu
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-// SATIŞ DANIŞMANI PROMPTU - GuGu Clinic
 const SYSTEM_PROMPT = `
 Sen GuGu Clinic'de satış danışmanısın. İsmin Elsie. Samimi, sıcak, güven veren, satış odaklı ama abartısız konuşuyorsun. Kısa ve net yaz.
 
@@ -58,25 +55,28 @@ async function getGeminiReply(userMessage) {
     if (!GEMINI_API_KEY) {
       return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Dudak dolgusu Russian Lips 3800 TL. Size ne zaman için düşünüyordunuz?`;
     }
-    // DÜZELTİLDİ: model ismi gemini-2.0-flash
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // GÜNCEL MODEL - Google'ın önerdiği
+    const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
     const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nMüşteri: ${userMessage}\nDanışman:`);
     const response = await result.response;
     return response.text().slice(0, 900);
   } catch (err) {
     console.error("Gemini hatası:", err.message);
-    // Yedek cevap - Gemini çökse bile satış yapmaya devam eder
-    if (userMessage.toLowerCase().includes("dudak")) {
-      return `Merhabalar, dudak dolgusu Russian Lips tekniği ile Elasty veya Tuscan marka 3800 TL nakit kampanyada, Juvederm isterseniz 5400 TL. Çok doğal ve kalıcı sonuçlar. Size ne zaman için düşünüyordunuz?`;
+    // Eğer 3.8 de olmazsa yedekler - otomatik mesaj gibi durmasın diye soruya göre değişiyor
+    const lower = userMessage.toLowerCase();
+    if (lower.includes("dudak")) {
+      return `Merhabalar, dudak dolgusu Russian Lips tekniği ile Elasty veya Tuscan marka 3800 TL nakit kampanyada, Juvederm isterseniz 5400 TL. Çok doğal duruyor. Size ne zaman için düşünüyordunuz?`;
     }
-    if (userMessage.toLowerCase().includes("botox") || userMessage.toLowerCase().includes("botoks")) {
-      return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Alın, kaş arası, kaz ayakları ve ihtiyaç olan diğer bölgelere Dr. Özgen Yıldırım uyguluyor. Somon DNA ve Paris ışıltısı da dahil. Size en yakın uygun gün için randevu oluşturalım mı?`;
+    if (lower.includes("radie") || lower.includes("radiesse")) {
+      return `Merhabalar, Radiesse CaHA kollajen uyarıcımız nakitte 19000 TL kampanyada. Ciltte sıkılaşma ve toparlama sağlıyor. Novuma alternatifimiz de 14000 TL. Size en yakın uygun gün için randevu oluşturalım mı? Detay için 0534 248 94 70'ten doktorumuza ulaşabilirsiniz.`;
     }
-    return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL, dolgu çeşitleri 3800 TL kampanyada. Detaylı bilgi için 0534 248 94 70'ten doktorumuza ulaşabilirsiniz. Size nasıl yardımcı olayım?`;
+    if (lower.includes("botox") || lower.includes("botoks")) {
+      return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Alın, kaş arası, kaz ayakları ve ihtiyaç olan diğer bölgelere Dr. Özgen Yıldırım uyguluyor. Somon DNA ve Paris ışıltısı da dahil. Size ne zaman için düşünüyordunuz?`;
+    }
+    return `Merhabalar, 5 bölge botox 3800 TL, tüm dolgu çeşitleri 3800 TL nakit kampanyada. Burun 5500 TL, şakak 4500 TL. Size nasıl yardımcı olayım? Detay için 0534 248 94 70.`;
   }
 }
 
-// Webhook Doğrulama
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -88,7 +88,6 @@ app.get('/webhook', (req, res) => {
   return res.sendStatus(403);
 });
 
-// Webhook Dinleyici
 app.post('/webhook', async (req, res) => {
   const body = req.body;
   if (body.object === 'instagram' || body.object === 'page') {
@@ -112,20 +111,13 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Mesaj Gönderme
 async function sendInstagramMessage(recipientId, text) {
   try {
     const url = `https://graph.facebook.com/v20.0/${IG_ID}/messages`;
     const response = await axios.post(
       url,
-      {
-        recipient: { id: recipientId },
-        message: { text: text }
-      },
-      {
-        params: { access_token: PAGE_ACCESS_TOKEN },
-        headers: { 'Content-Type': 'application/json' }
-      }
+      { recipient: { id: recipientId }, message: { text: text } },
+      { params: { access_token: PAGE_ACCESS_TOKEN }, headers: { 'Content-Type': 'application/json' } }
     );
     console.log(`🚀 Gönderildi: "${text.slice(0,80)}..." | ID:`, response.data.message_id);
   } catch (error) {
@@ -133,10 +125,5 @@ async function sendInstagramMessage(recipientId, text) {
   }
 }
 
-app.get('/', (req, res) => {
-  res.send('Bot Aktif! GuGu Clinic');
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Sunucu ${PORT} portunda dinleniyor...`);
-});
+app.get('/', (req, res) => res.send('Bot Aktif! GuGu Clinic'));
+app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} portunda dinleniyor...`));
