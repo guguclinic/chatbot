@@ -17,7 +17,7 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 // SATIŞ DANIŞMANI PROMPTU - GuGu Clinic
 const SYSTEM_PROMPT = `
-Sen GuGu Clinic'de satış danışmanısın. İsmin Elsie. Samimi, sıcak, güven veren, satış odaklı ama abartısız konuşuyorsun. Kısa ve net yaz, 1-2 cümlede bir emoji kullanabilirsin.
+Sen GuGu Clinic'de satış danışmanısın. İsmin Elsie. Samimi, sıcak, güven veren, satış odaklı ama abartısız konuşuyorsun. Kısa ve net yaz.
 
 KLİNİK BİLGİSİ:
 - Doktorumuz: Dr. Özgen Yıldırım, Uzman Medikal Estetik Hekimi, 2004'den beri medikal estetik yapıyoruz.
@@ -41,34 +41,42 @@ Alın + kaş arası + kaz ayakları + ihtiyaca göre burun kenarındaki çizgile
 - Şakak dolgusu: 4500 TL
 - Dudak üstü barkod çizgileri için özel Skin Booster'lar: 3500 TL
 
-5. CaHA ÜRÜNLERİ (Kollajen uyarıcılar):
+5. CaHA ÜRÜNLERİ:
 - Radiesse: 19000 TL nakit
 - Novuma: 14000 TL nakit
 
 KONUŞMA KURALLARI:
 - Satış odaklı ol, müşteri memnuniyetini yüksek tut.
 - Beklentiyi normal tut, mucize vaat etme.
-- Çok teknik soru sorana veya kararsız kalana: "Çok detaylı sorularınız için uzman doktorumuzu 0534 248 94 70 numaradan arayarak anında detaylı bilgi alabilirsiniz" de.
-- Fiyat sorulduğunda direkt kampanyayı söyle, sonra randevuya yönlendir: "Size en yakın uygun gün için randevu oluşturalım mı?"
-- Asla tıbbi doz, risk, yan etki detayı verme, muayene gerektiğini söyle.
+- Çok teknik soru sorana: "Çok detaylı sorularınız için uzman doktorumuzu 0534 248 94 70 numaradan arayarak anında detaylı bilgi alabilirsiniz" de.
+- Fiyat sorulduğunda kampanyayı söyle, sonra randevuya yönlendir: "Size en yakın uygun gün için randevu oluşturalım mı?"
+- Asla tıbbi doz, risk, yan etki detayı verme.
 `;
 
 async function getGeminiReply(userMessage) {
   try {
     if (!GEMINI_API_KEY) {
-      return `Merhabalar, mesajınızı aldım. Detaylı bilgi için 0534 248 94 70'ten uzmanımıza ulaşabilirsiniz.`;
+      return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Dudak dolgusu Russian Lips 3800 TL. Size ne zaman için düşünüyordunuz?`;
     }
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // DÜZELTİLDİ: model ismi gemini-2.0-flash
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nMüşteri: ${userMessage}\nDanışman:`);
     const response = await result.response;
-    return response.text().slice(0, 900); // Instagram 1000 karakter limiti
+    return response.text().slice(0, 900);
   } catch (err) {
     console.error("Gemini hatası:", err.message);
-    return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Dudak dolgusu Russian Lips 3800 TL. Size ne zaman için düşünüyordunuz? Detay için 0534 248 94 70'ten doktorumuza ulaşabilirsiniz.`;
+    // Yedek cevap - Gemini çökse bile satış yapmaya devam eder
+    if (userMessage.toLowerCase().includes("dudak")) {
+      return `Merhabalar, dudak dolgusu Russian Lips tekniği ile Elasty veya Tuscan marka 3800 TL nakit kampanyada, Juvederm isterseniz 5400 TL. Çok doğal ve kalıcı sonuçlar. Size ne zaman için düşünüyordunuz?`;
+    }
+    if (userMessage.toLowerCase().includes("botox") || userMessage.toLowerCase().includes("botoks")) {
+      return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Alın, kaş arası, kaz ayakları ve ihtiyaç olan diğer bölgelere Dr. Özgen Yıldırım uyguluyor. Somon DNA ve Paris ışıltısı da dahil. Size en yakın uygun gün için randevu oluşturalım mı?`;
+    }
+    return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL, dolgu çeşitleri 3800 TL kampanyada. Detaylı bilgi için 0534 248 94 70'ten doktorumuza ulaşabilirsiniz. Size nasıl yardımcı olayım?`;
   }
 }
 
-// 1. Webhook Doğrulama (GET)
+// Webhook Doğrulama
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -80,13 +88,11 @@ app.get('/webhook', (req, res) => {
   return res.sendStatus(403);
 });
 
-// 2. Webhook Olay Dinleyici (POST)
+// Webhook Dinleyici
 app.post('/webhook', async (req, res) => {
   const body = req.body;
-
   if (body.object === 'instagram' || body.object === 'page') {
     res.status(200).send('EVENT_RECEIVED');
-
     for (const entry of body.entry) {
       const messagingEvent = entry.messaging ? entry.messaging[0] : null;
       if (messagingEvent && messagingEvent.message && messagingEvent.message.text) {
@@ -96,12 +102,8 @@ app.post('/webhook', async (req, res) => {
         }
         const senderId = messagingEvent.sender.id;
         const receivedMessage = messagingEvent.message.text;
-        
         console.log(`💬 Gelen Mesaj [IGSID: ${senderId}]: ${receivedMessage}`);
-
-        // Gemini'den satış odaklı cevap al
         const replyText = await getGeminiReply(receivedMessage);
-        
         await sendInstagramMessage(senderId, replyText);
       }
     }
@@ -110,7 +112,7 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// 3. Instagram Mesaj Gönderme
+// Mesaj Gönderme
 async function sendInstagramMessage(recipientId, text) {
   try {
     const url = `https://graph.facebook.com/v20.0/${IG_ID}/messages`;
@@ -125,7 +127,7 @@ async function sendInstagramMessage(recipientId, text) {
         headers: { 'Content-Type': 'application/json' }
       }
     );
-    console.log(`🚀 Gönderildi: "${text.slice(0,80)}..." | ID:`, response.data.message_id || response.data.message_id);
+    console.log(`🚀 Gönderildi: "${text.slice(0,80)}..." | ID:`, response.data.message_id);
   } catch (error) {
     console.error('❌ Mesaj gönderme hatası:', error.response ? JSON.stringify(error.response.data) : error.message);
   }
