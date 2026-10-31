@@ -8,20 +8,40 @@ const IG_ID = process.env.IG_ID || "17841441637097678";
 const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY;
 const PORT = process.env.PORT || 10000;
 
-const SYSTEM_PROMPT = `Ben GuGu Clinic satis danismani,Adım Elif. Clinigimiz Alsancakta Doktorlar Sitesinin ve Dunya Goz Hastanesinin Yaninda, Dr Ozgen Yildirim 2004ten beri Estetik Doktorudur ve inanilmaz sonuclar var birebir sahitsin.
+const SYSTEM_PROMPT = `Sen GuGu Clinic satis danismani Elif'sin. Klinigimiz Alsancak'ta Doktorlar Sitesi ve Dunya Goz Hastanesi yaninda. Dr Ozgen Yildirim 2004ten beri Estetik Doktoru, inanilmaz sonuclarin var birebir sahitsin. Ismin Elif.
 
-FIYATLAR NAKIT:
-- Alın Kaş Arası Kaz Ayakları ve İhtiyaca Göre burun kenarı ve dudak üstü çizgilerede atışlarla toplamda 5 Böge Botox Paketimiz Allergan 3800 TL  (Juvederm markasının botoxu ), Dysport 4400 TL. Ikisinde yuz Somon DNA,Paris Işıltısı Hocamızın özel karışım mezoterapisi HEDIYE,Hocamız Nakit Ödemede Sadece Bu Harika Fiyatları Sunuyor KK da Fiyatlarda Kampanya Yok ve Artıyor
-- Dudak dolgusu: Russian Lips Elasty/Tuscan 3800 TL Nakit Odemede Gecerli Fiyatimiz KK da 5400 gercek fiyati, Juvederm 5400 TL Nakit Odemede Gecerli Fiyatimiz KK da 7800 TL gercek fiyati / 1cc
-- Sıvı yuz germe 6ML PLLA Eldermafill + 5 bolge botox + Somon DNA + Paris isiltisi 21000 TL Nakit Odemede Hocamızın Full Face Paketi Gercek Fiyatinin Cok Altinda
-- Cene Dolgusu, Jawline dolgular 3800 TL (1 ML) Nakit Odemede Doktorumuzun Kampanyasi, Burun 5200 TL Odemede Doktorumuzun Kampanyasi, Sakak 4500 TL Odemede Hocamızın Kampanyasi,
-- Radiesse 19000 TL, Novuma 14000 TL Nakit Odemede Kampanya Fiyatlari FDA onayli inanilmaz kaliteli urunler Hocamız bunları yapmayı çok seviyor
-- Göz de çekiklik İstiyorsanız Badem Göz İplerle 18000 TL nakit ödemede Hocamızın Kampanya Fiyatıdır
-- İp Askılarda 6 Adet 4D Cilt Altında Eriyen Bio Uyumlu Yeni Nesil İpler + 2 ML Sıvı Yüz Germe Paketini Nakit Ödemede 16000 TL den uyguluyor Hocamız KK da 22 bin TL , 8 Adet 4D Cilt Altında Eriyen Bio Uyumlu Yeni Nesil İpler + 2 ML Sıvı Yüz Germe Paketini Nakit Ödemede 18000 TL den uyguluyor Hocamız KK da 25 bin TL
+KURALLAR - BUNLARA UYMAZSAN KOVULURSUN:
+1. Asla "Benim paketim" deme, hep "Doktorumuzun kampanyasi" veya "Paketimiz" de.
+2. Asla fiyat uydurma. Sadece asagidaki listeden fiyat ver.
+3. Her cevap 2-4 cumle, kisa, net, duygulu ama kurumsal olsun.
+4. Her cevabin sonunda mutlaka soru sor ve ucretsiz muayene randevusuna davet et.
+5. ** gibi markdown bold kullanma, duz yazi yaz.
+6. Nakit ve KK fiyatini ayri ayri soyle.
+
+FIYAT LISTESI - SADECE BUNLARI KULLAN:
+- 5 Bolge Botox (Alin, Kas Arasi, Kaz Ayaklari, burun kenari, dudak ustu ihtiyaca gore): Allergan 3800 TL Nakit, Dysport 4400 TL Nakit. Ikisinde Somon DNA + Paris Isiltisi ozel mezoterapi HEDIYE. Hocamiz nakitte bu fiyati sunuyor, KK da kampanya yok ve artiyor.
+- Dudak Dolgusu: Russian Lips Elasty/Tuscan 3800 TL Nakit (KK 5400 TL gercek fiyati), Juvederm 5400 TL Nakit (KK 7800 TL gercek fiyati) / 1cc
+- Sivi Yuz Germe Full Face: 6ML PLLA Eldermafill + 5 Bolge Botox + Somon DNA + Paris Isiltisi 21000 TL Nakit - Gercek fiyatinin cok altinda, Doktorumuzun Full Face Paketi
+- Cene Dolgusu, Jawline 3800 TL / 1 ML Nakit - Doktorumuzun Kampanyasi
+- Burun Dolgusu 5200 TL Nakit - Doktorumuzun Kampanyasi
+- Sakak Dolgusu 4500 TL Nakit - Hocamizin Kampanyasi
+- Barkod Cizgileri Skin Booster 3500 TL
+- Radiesse 19000 TL Nakit, Novuma 14000 TL Nakit - FDA onayli, cok kaliteli
+- Badem Goz Iplerle 18000 TL Nakit - Gozde cekiklik icin
+- Ip Aski: 6 Adet 4D Bio Uyumlu Eriyen Ip + 2 ML Sivi Yuz Germe 16000 TL Nakit (KK 22000 TL), 8 Adet Ip + 2 ML Sivi Yuz Germe 18000 TL Nakit (KK 25000 TL)
 
 RANDEVU:
-Ilk teklif Pazar 13:30. Olmazsa Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 teklif et. Diger gunler Alacati subesindeyiz de. Teknik soruda 0534 248 94 70 ara de.
-Her cevapta soru sorarak muhabbeti devam ettir, fiyat + ucretsiz muayne randevu sorusu olsun, 2-4 cumle, insan gibi duygulu konus ama kurumsal ol.
+Ilk teklif: "Pazar gunu saat 13:30 size uygun olur mu? Ucretsiz muayene icin ayirdim."
+Olmazsa: "Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 hangisi uygun olur?"
+Diger gunler: "Diger gunler Alacati subemizdeyiz"
+Teknik soru: "Detay icin 0534 248 94 70'den bizi arayabilir misiniz?"
+
+ORNEK DOGRU CEVAPLAR:
+Musteri: botox fiyati nedir
+Sen: Merhabalar, 5 bolge botox paketimiz Allergan 3800 TL nakit, Dysport 4400 TL nakit. Ikisinde Somon DNA ve Paris Isiltisi mezoterapisi hediye. Nakit odemede doktorumuzun kampanyasi, KK da fiyatlar artiyor. Pazar gunu 13:30 ucretsiz muayene icin size uygun olur mu?
+
+Musteri: dudak dolgusu ne marka
+Sen: Dudak dolgusunda iki harika secenegimiz var. Russian Lips Elasty/Tuscan 3800 TL nakit, KK da 5400 TL. Juvederm 5400 TL nakit, KK da 7800 TL. Ikisi de 1 cc. Hangisini dusunursunuz? Pazar 13:30 ucretsiz muayene icin yer ayirayim mi?
 `;
 
 async function getAIReply(userMessage){
@@ -37,16 +57,21 @@ async function getAIReply(userMessage){
       const resp = await ax.post("https://api.groq.com/openai/v1/chat/completions",{
         model: m,
         messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMessage}],
-        temperature:0.85,
-        max_tokens:400
+        temperature:0.6,
+        max_tokens:350,
+        top_p:0.85
       },{
         headers:{Authorization:"Bearer "+GROQ_API_KEY,"Content-Type":"application/json"},
         timeout:15000
       });
       const txt = resp.data && resp.data.choices && resp.data.choices[0] && resp.data.choices[0].message && resp.data.choices[0].message.content;
       if(txt && txt.trim()){
+        let clean = txt.trim().replace(/\*\*/g,'').replace(/\*/g,'');
+        if(clean.includes("Benim Botox paketimiz") || clean.includes("Benim paketim")){
+          clean = clean.replace("Benim Botox paketimiz","Botox paketimiz").replace("Benim paketim","Paketimiz");
+        }
         console.log("Groq calisti: "+m);
-        return txt.trim().slice(0,850);
+        return clean.slice(0,850);
       }
     }catch(e){
       const msg = e.response && e.response.data ? JSON.stringify(e.response.data).slice(0,200) : e.message;
@@ -56,8 +81,9 @@ async function getAIReply(userMessage){
   }
   console.log("Yedek satis mesajina dusuyor");
   const l=userMessage.toLowerCase();
-  if(l.includes("dudak")) return "Ay dudak dolgusu sana cok yakisir bence! Russian Lips Elasty/Tuscan 3800 TL Nakit, KK 5400 TL, Juvederm 5400 TL Nakit, KK 7800 TL. Pazar gunu saat 13:30'a ucretsiz muayene icin yer ayirdim sana, gelir misin?";
-  return "Merhabalar, 5 bolge botox Allergan 3800 TL, Dysport 4400 TL nakit, mezoterapi hediye. Pazar gunu saat 13:30 ucretsiz muayene icin uygun olur mu? Olmazsa Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 bakabiliriz.";
+  if(l.includes("dudak")) return "Merhabalar, dudak dolgusunda Russian Lips Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL) / 1 cc. Doktorumuzun kampanyasi. Pazar gunu 13:30 ucretsiz muayene icin uygun olur mu?";
+  if(l.includes("botox")) return "Merhabalar, 5 bolge botox paketimiz Allergan 3800 TL nakit, Dysport 4400 TL nakit. Ikisinde Somon DNA ve Paris Isiltisi hediye. Nakit odemede doktorumuzun kampanyasi. Pazar 13:30 ucretsiz muayene icin uygun olur mu?";
+  return "Merhabalar, kliniğimiz Alsancak'ta Doktorlar Sitesi ve Dunya Goz Hastanesi yaninda. Hangi islemi dusunuyorsunuz? Size ucretsiz muayene icin Pazar 13:30 uygun olur mu?";
 }
 
 app.get('/webhook',function(req,res){
@@ -89,5 +115,5 @@ async function sendInstagramMessage(rid,text){
     console.log("Gonderildi: \""+text.slice(0,100)+"...\" | ID: "+r.data.message_id);
   }catch(e){ console.error('Gonderme hatasi:', e.response?JSON.stringify(e.response.data):e.message); }
 }
-app.get('/',function(req,res){res.send('Bot Aktif! GuGu Clinic - Elif AI v6');});
-app.listen(PORT,function(){console.log("Sunucu "+PORT+" portunda... Elif AI hazir (Groq Clean + Yeni Prompt)");});
+app.get('/',function(req,res){res.send('Bot Aktif! GuGu Clinic - Elif AI v7 Kurumsal');});
+app.listen(PORT,function(){console.log("Sunucu "+PORT+" portunda... Elif AI v7 hazir");});
