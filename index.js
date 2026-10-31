@@ -51,37 +51,30 @@ KONUŞMA KURALLARI:
 `;
 
 async function getGeminiReply(userMessage) {
-  const modelsToTry = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro"];
-  
-  for (const modelName of modelsToTry) {
-    try {
-      if (!GEMINI_API_KEY) throw new Error("API_KEY yok");
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nMüşteri: ${userMessage}\nDanışman:`);
-      const response = await result.response;
-      console.log(`✅ Gemini çalıştı: ${modelName}`);
-      return response.text().slice(0, 900);
-    } catch (err) {
-      console.log(`❌ Model ${modelName} olmadı: ${err.message.slice(0,120)}`);
-      continue;
+  try {
+    if (!GEMINI_API_KEY) {
+      return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Dudak dolgusu Russian Lips 3800 TL. Size ne zaman için düşünüyordunuz?`;
     }
+    // GÜNCEL MODEL - Google'ın önerdiği
+    const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
+    const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nMüşteri: ${userMessage}\nDanışman:`);
+    const response = await result.response;
+    return response.text().slice(0, 900);
+  } catch (err) {
+    console.error("Gemini hatası:", err.message);
+    // Eğer 3.8 de olmazsa yedekler - otomatik mesaj gibi durmasın diye soruya göre değişiyor
+    const lower = userMessage.toLowerCase();
+    if (lower.includes("dudak")) {
+      return `Merhabalar, dudak dolgusu Russian Lips tekniği ile Elasty veya Tuscan marka 3800 TL nakit kampanyada, Juvederm isterseniz 5400 TL. Çok doğal duruyor. Size ne zaman için düşünüyordunuz?`;
+    }
+    if (lower.includes("radie") || lower.includes("radiesse")) {
+      return `Merhabalar, Radiesse CaHA kollajen uyarıcımız nakitte 19000 TL kampanyada. Ciltte sıkılaşma ve toparlama sağlıyor. Novuma alternatifimiz de 14000 TL. Size en yakın uygun gün için randevu oluşturalım mı? Detay için 0534 248 94 70'ten doktorumuza ulaşabilirsiniz.`;
+    }
+    if (lower.includes("botox") || lower.includes("botoks")) {
+      return `Merhabalar, 5 bölge botox paketimiz nakitte 3800 TL kampanyada, her şey dahil. Alın, kaş arası, kaz ayakları ve ihtiyaç olan diğer bölgelere Dr. Özgen Yıldırım uyguluyor. Somon DNA ve Paris ışıltısı da dahil. Size ne zaman için düşünüyordunuz?`;
+    }
+    return `Merhabalar, 5 bölge botox 3800 TL, tüm dolgu çeşitleri 3800 TL nakit kampanyada. Burun 5500 TL, şakak 4500 TL. Size nasıl yardımcı olayım? Detay için 0534 248 94 70.`;
   }
-  
-  console.log("⚠️ Gemini hepsi başarısız, yedek mesaja düşüyor");
-  const lower = userMessage.toLowerCase();
-  if (lower.includes("radie") || lower.includes("radiesse") || lower.includes("novuma")) {
-    return `Merhabalar, Radiesse 19000 TL, Novuma 14000 TL nakit kampanyada. CaHA kollajen uyarıcılar, cildi sıkılaştırıyor. Size en yakın uygun gün için randevu oluşturalım mı? Detay için 0534 248 94 70.`;
-  }
-  if (lower.includes("dudak")) {
-    return `Merhabalar, dudak dolgusu Russian Lips Elasty/Tuscan 3800 TL nakit, Juvederm 5400 TL. Çok doğal duruyor. Size ne zaman için düşünüyordunuz?`;
-  }
-  if (lower.includes("botox") || lower.includes("botoks")) {
-    return `Merhabalar, 5 bölge botox + Somon DNA + Paris ışıltısı + özel mezoterapiler her şey dahil 3800 TL nakit kampanyada. Dr. Özgen Yıldırım uyguluyor. Size ne zaman için düşünüyordunuz?`;
-  }
-  if (lower.includes("burun")) {
-    return `Merhabalar, burun dolgusu 5500 TL nakit kampanyada. Çok doğal sonuçlar. Size ne zaman için düşünüyordunuz?`;
-  }
-  return `Merhabalar, 5 bölge botox ve dolgu çeşitleri 3800 TL nakit kampanyada. Size nasıl yardımcı olayım? Detay için 0534 248 94 70.`;
 }
 
 app.get('/webhook', (req, res) => {
