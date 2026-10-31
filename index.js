@@ -11,103 +11,104 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const PORT = process.env.PORT || 10000;
 
 const SYSTEM_PROMPT = `
-Sen GuGu Clinic'de satış danışmanısın. İsmin Elsie. Samimi, sıcak, güven veren, satış odaklı ama abartısız konuşuyorsun. Kısa ve net yaz.
+Sen GuGu Clinic'de satis danismanisin. Ismin Elsie. Samimi, sicak, guven veren, satis odakli ama abartisiz konusuyorsun. Kisa ve net yaz.
 
-KAMPANYALAR (NAKİT):
-- 5 BÖLGE BOTOX: 【entity-Allergan¦canonical_name=Allergan】 3800 TL (Juvederm'in botoxu, ilk çıkan marka), Dysport 4400 TL. İkisinde de parıltı ve canlılık veren kombine yüz mezoterapileri HEDİYE.
+KAMPANYALAR (NAKIT):
+- 5 BOLGE BOTOX: 【entity-Allergan¦canonical_name=Allergan】 3800 TL (Juvederm'in botoxu, ilk cikan marka), Dysport 4400 TL. Ikisinde de parlanti ve canlilik veren kombine yuz mezoterapileri HEDIYE.
 - DUDAK DOLGUSU: Russian Lips Elasty/Tuscan 3800 TL, Juvederm 5400 TL / 1cc
-- SIVI YÜZ GERME FULL FACE: 6 ML PLLA Eldermafill + 5 bölge botox + Somon DNA + Paris ışıltısı = 21000 TL
-- DİĞER DOLGULAR: Tüm çeşitler 3800 TL, Burun 5500 TL, Şakak 4500 TL, Barkod Skin Booster 3500 TL
+- SIVI YUZ GERME FULL FACE: 6 ML PLLA Eldermafill + 5 bolge botox + Somon DNA + Paris isiltisi = 21000 TL
+- DIGER DOLGULAR: Tum cesitler 3800 TL, Burun 5500 TL, Sakak 4500 TL, Barkod Skin Booster 3500 TL
 - CaHA: Radiesse 19000 TL, Novuma 14000 TL
 
 RANDEVU:
-- İlk teklif: "Pazar günü saat 13:30 size uygun olur mu?"
-- Olmazsa: Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 pazarlığı yap
-- Diğer günler: "Diğer günler Alaçatı şubemizde müşterilerimizin ve hastanedeki hastalarımızın randevularıyla ilgileniyoruz"
-- Teknik soru: "Detay için uzman doktorumuzu 0534 248 94 70'ten arayabilirsiniz" de
+- Ilk teklif: "Pazar gunu saat 13:30 size uygun olur mu?"
+- Olmazsa: Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 pazarligi yap
+- Diger gunler: "Diger gunler Alacati subemizde musterilerimizin ve hastanedeki hastalarimizin randevulariyla ilgileniyoruz"
+- Teknik soru: "Detay icin uzman doktorumuzu 0534 248 94 70'ten arayabilirsiniz" de
 `;
 
-// Önce Google'dan hangi modeller açık onu sor, sonra ilk uygun olanı kullan
 async function getGeminiReply(userMessage) {
   try {
     if (!GEMINI_API_KEY) throw new Error("API_KEY yok");
 
-    // 1. Google'dan açık model listesini al
     let availableModels = [];
     try {
-      const listUrl = `https://generativelanguage.googleapis.com/v1/models?key=${GEMINI_API_KEY}`;
+      const listUrl = "https://generativelanguage.googleapis.com/v1/models?key=" + GEMINI_API_KEY;
       const listRes = await 【entity-axios¦canonical_name=axios】.get(listUrl);
       availableModels = listRes.data.models
-        .filter(m => m.supportedGenerationMethods?.includes("generateContent"))
-        .map(m => m.name.replace("models/", ""));
-      console.log("📋 Açık modeller:", availableModels.slice(0,5).join(", "));
+        .filter(function(m) { return m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"); })
+        .map(function(m) { return m.name.replace("models/", ""); });
+      console.log("Acik modeller:", availableModels.slice(0,5).join(", "));
     } catch (e) {
-      console.log("Model listesi alınamadı, hardcoded denenecek");
+      console.log("Model listesi alinamadi, hardcoded denenecek");
     }
 
-    // 2. Denenecek sıra - önce listeden gelenler, sonra güncel bilinenler
-    const tryList = [
-      ...availableModels,
+    const tryList = [].concat(availableModels, [
       "gemini-2.0-flash-001",
       "gemini-2.0-flash-lite-001",
       "gemini-1.5-flash-001",
       "gemini-1.5-flash-8b",
       "gemini-1.5-flash-002",
       "gemini-1.5-pro-001"
-    ];
+    ]);
 
-    for (const modelName of tryList) {
+    for (let i = 0; i < tryList.length; i++) {
+      const modelName = tryList[i];
       try {
-        const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+        const url = "https://generativelanguage.googleapis.com/v1/models/" + modelName + ":generateContent?key=" + GEMINI_API_KEY;
         const response = await axios.post(url, {
-          contents: [{ role: "user", parts: [{ text: `${SYSTEM_PROMPT}\n\nMüşteri: ${userMessage}\nDanışman:` }] }],
+          contents: [{ role: "user", parts: [{ text: SYSTEM_PROMPT + "\n\nMusteri: " + userMessage + "\nDanisman:" }] }],
           generationConfig: { temperature: 0.8, maxOutputTokens: 600 }
         }, { headers: { 'Content-Type': 'application/json' } });
 
-        const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const text = response.data && response.data.candidates && response.data.candidates[0] && response.data.candidates[0].content && response.data.candidates[0].content.parts && response.data.candidates[0].content.parts[0] && response.data.candidates[0].content.parts[0].text;
         if (text) {
-          console.log(`✅ Gemini çalıştı: ${modelName} (REST v1)`);
+          console.log("Gemini calisti: " + modelName + " (REST v1)");
           return text.slice(0, 900);
         }
       } catch (err) {
-        const msg = err.response?.data?.error?.message?.slice(0,100) || err.message.slice(0,100);
-        console.log(`❌ Model ${modelName} olmadı: ${msg}`);
+        const msg = err.response && err.response.data && err.response.data.error ? err.response.data.error.message : err.message;
+        console.log("Model " + modelName + " olmadi: " + (msg ? msg.slice(0,100) : "hata"));
         continue;
       }
     }
-    throw new Error("Tüm modeller kapalı");
+    throw new Error("Tum modeller kapali");
 
   } catch (err) {
-    console.log("⚠️ Yedek satış mesajına düşüyor");
+    console.log("Yedek satis mesajina dusuyor");
     const lower = userMessage.toLowerCase();
     if (lower.includes("botox") || lower.includes("botoks") || lower.includes("marka")) {
-      return `Merhabalar, 5 bölge botox 【entity-Allergan¦canonical_name=Allergan】 3800 TL (Juvederm'in botoxu, ilk çıkan marka), Dysport 4400 TL nakit. İkisinde de mezoterapi hediye. Pazar günü saat 13:30 size uygun olur mu?`;
+      return "Merhabalar, 5 bolge botox 【entity-Allergan¦canonical_name=Allergan】 3800 TL (Juvederm'in botoxu, ilk cikan marka), Dysport 4400 TL nakit. Ikisinde de mezoterapi hediye. Pazar gunu saat 13:30 size uygun olur mu?";
     }
-    if (lower.includes("dudak") || lower.includes("russian")) return `Dudak dolgusu Russian Lips Elasty/Tuscan 3800 TL, Juvederm 5400 TL. Pazar 13:30 uyar mı?`;
-    if (lower.includes("radie") || lower.includes("radiesse") || lower.includes("novuma")) return `Radiesse 19000 TL, Novuma 14000 TL nakit. Pazar 13:30 için randevu oluşturalım mı? Detay için 0534 248 94 70.`;
-    return `Merhabalar, 5 bölge botox Allergan 3800 TL, Dysport 4400 TL nakit, her şey dahil mezoterapiler hediye. Pazar 13:30 size uygun olur mu? Olmazsa Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 bakabiliriz.`;
+    if (lower.includes("dudak") || lower.includes("russian")) return "Dudak dolgusu Russian Lips Elasty/Tuscan 3800 TL, Juvederm 5400 TL. Pazar 13:30 uyar mi?";
+    if (lower.includes("radie") || lower.includes("radiesse") || lower.includes("novuma")) return "Radiesse 19000 TL, Novuma 14000 TL nakit. Pazar 13:30 icin randevu olusturalim mi? Detay icin 0534 248 94 70.";
+    return "Merhabalar, 5 bolge botox Allergan 3800 TL, Dysport 4400 TL nakit, her sey dahil mezoterapiler hediye. Pazar 13:30 size uygun olur mu? Olmazsa Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 bakabiliriz.";
   }
 }
 
-app.get('/webhook', (req, res) => {
+app.get('/webhook', function(req, res) {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
-  if (mode && token === VERIFY_TOKEN) return res.status(200).send(challenge);
+  if (mode && token === VERIFY_TOKEN) {
+    console.log('Webhook dogrulama basarili!');
+    return res.status(200).send(challenge);
+  }
   return res.sendStatus(403);
 });
 
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', async function(req, res) {
   const body = req.body;
   if (body.object === 'instagram' || body.object === 'page') {
     res.status(200).send('EVENT_RECEIVED');
-    for (const entry of body.entry) {
+    for (let j = 0; j < body.entry.length; j++) {
+      const entry = body.entry[j];
       const messagingEvent = entry.messaging ? entry.messaging[0] : null;
-      if (messagingEvent?.message?.text) {
+      if (messagingEvent && messagingEvent.message && messagingEvent.message.text) {
         if (messagingEvent.message.is_echo) { console.log('i Echo atlandi'); continue; }
         const senderId = messagingEvent.sender.id;
         const receivedMessage = messagingEvent.message.text;
-        console.log(`💬 Gelen Mesaj [IGSID: ${senderId}]: ${receivedMessage}`);
+        console.log("Gelen Mesaj [IGSID: " + senderId + "]: " + receivedMessage);
         const replyText = await getGeminiReply(receivedMessage);
         await sendInstagramMessage(senderId, replyText);
       }
@@ -117,13 +118,13 @@ app.post('/webhook', async (req, res) => {
 
 async function sendInstagramMessage(recipientId, text) {
   try {
-    const url = `https://graph.facebook.com/v20.0/${IG_ID}/messages`;
-    const response = await 【entity-axios¦canonical_name=axios】.post(url, { recipient: { id: recipientId }, message: { text: text } }, { params: { access_token: PAGE_ACCESS_TOKEN }, headers: { 'Content-Type': 'application/json' } });
-    console.log(`🚀 Gönderildi: "${text.slice(0,80)}..." | ID:`, response.data.message_id);
+    const url = "https://graph.facebook.com/v20.0/" + IG_ID + "/messages";
+    const response = await axios.post(url, { recipient: { id: recipientId }, message: { text: text } }, { params: { access_token: PAGE_ACCESS_TOKEN }, headers: { 'Content-Type': 'application/json' } });
+    console.log("Gonderildi: \"" + text.slice(0,80) + "...\" | ID: " + response.data.message_id);
   } catch (error) {
-    console.error('❌ Mesaj gönderme hatası:', error.response ? JSON.stringify(error.response.data) : error.message);
+    console.error('Mesaj gonderme hatasi:', error.response ? JSON.stringify(error.response.data) : error.message);
   }
 }
 
-app.get('/', (req, res) => res.send('Bot Aktif! GuGu Clinic'));
-app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} portunda dinleniyor...`));
+app.get('/', function(req, res) { res.send('Bot Aktif! GuGu Clinic'); });
+app.listen(PORT, function() { console.log("Sunucu " + PORT + " portunda dinleniyor..."); });
