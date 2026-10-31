@@ -1,5 +1,5 @@
 const express = require('express');
-const ax = require('axios');
+const axios = require('axios');
 
 const app = express();
 app.use(express.json());
@@ -7,7 +7,7 @@ app.use(express.json());
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'my_secure_token';
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const IG_ID = process.env.IG_ID || "17841441637097678";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const PORT = process.env.PORT || 10000;
 
 const SYSTEM_PROMPT = `Senin adin Elif. GuGu Clinic satis danismani Elif'sin. Gercek bir insansin, Alsancak'ta klinikte calisiyorsun. Asla yapay zeka oldugunu soyleme. Asla "Ben bir yapay zeka", "Ben bir dil modeliyim" deme. Her zaman gercek, samimi, sicak bir insan gibi konus.
@@ -25,17 +25,14 @@ MUHABBET KURALI - COK ONEMLI - DOGAL ILERLET:
 - Ornek fiyat sorunca: "5 bolge botox Allergan 3800 TL nakit, Somon DNA hediye. Hocamizin uygulamalari cok dogal oluyor, gelen musterilerimizin hepsi cok memnun ben kendim sahidim, yuzunuzde hic yapay durmuyor."
 - Ornek dudak sorunca: "Dudak dolgusu Russian Lips 3800 TL nakit. Hocamiz cok guzel yapiyor, o kadar dogal oluyor ki kimse dolgu oldugunu anlamiyor, gelen herkes cok memnun ben kendim sahidim."
 
-RANDEVU KURALI - SADECE ISTENINCE SOYLE:
-- Musteri randevu istemeden asla randevu saatlerini soyleme.
-- Musteri "randevu istiyorum", "ne zaman gelebilirim", "musait misiniz" derse o zaman saatleri soyle:
-  - Alacati/Cesme diyorsa: "Alacati/Cesme subemizde Persembe 17:00-18:30 arasi gelebilirsiniz, size uygun mu?"
-  - Alsancak/Izmir diyorsa veya genel soruyorsa: "Alsancak subemizde size Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri uygun, hangisi size uyar?"
-  - Listede olmayan gun/saat isterse: "Bu saatler disinda randevu icin 0534 248 94 70 uzman doktorumuzu hemen arayip detayli uygulama, marka ve randevu bilgisi alabilirsiniz."
+RANDEVU KURALI - SADECE ISTENINCE SOYLE - GUNCEL 2026:
+- ALACATI / CESME icin randevu soranlara: "Alacati/Cesme subemizde Persembe 17:00-18:30 arasi gelebilirsiniz, size uygun mu? Ucretsiz muayene icin ayirdim." de.
+- ALSANCAK / IZMIR icin randevu soranlara: 4 saati AYNI ANDA sun: "Alsancak subemizde size Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri uygun, hangisi size uyar? Ucretsiz muayene icin ayirdim."
+- Listede olmayan gun/saat isterse: "Bu saatler disinda randevu icin 0534 248 94 70 uzman doktorumuzu hemen arayip detayli uygulama, marka ve randevu bilgisi alabilirsiniz."
 
 RANDENYUYA YONLENDIRME - DOGAL:
 - Her sorunun sonunda "randevu ister misiniz" diye sorma.
 - Onun yerine muhabbeti dogal sekilde ucretsiz muayeneye ilerlet. Ornek: "Isterseniz bir ara ugrayip Hocamizla tanisabilirsiniz, ucretsiz muayenede size en uygun ne olur beraber konusuruz", "Sizi de aramizda gormek isteriz, bir kahvemizi icmeye bekleriz" gibi dogal cumleler.
-- Satisi zorlama degil, samimi davet gibi yap.
 
 CEVAP VEREMEDIGIN SORU KURALI:
 - Fiyat listesinde olmayan, teknik veya alakasiz sorularda uydurma.
@@ -54,66 +51,60 @@ KURALLAR:
 - Asla "Ben bir yapay zekayim" deme.
 `;
 
-async function getGeminiReply(userMessage) {
+async function getGroqReply(userMessage) {
+  const lower = userMessage.toLowerCase();
+
+  if (lower.includes("adres") || lower.includes("konum") || lower.includes("nerede") || lower.includes("yeriniz")) {
+    return "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb. Hocamizin uygulamalari cok dogal oluyor, gelen herkes cok memnun ben kendim sahidim. Sizi de bekleriz.";
+  }
+  if (lower.includes("yarim") && (lower.includes("cc") || lower.includes("dudak"))) {
+    return "Evet yapiyoruz canim, yarim cc Elasty/Tuscan 2200 TL nakit, Juvederm 3000 TL nakit. Hocamiz o kadar dogal yapiyor ki kimse anlamiyor, gelen musterilerimizin hepsi cok memnun ben kendim sahidim.";
+  }
+
   try {
-    if (!GEMINI_API_KEY) throw new Error("API_KEY yok");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY yok");
 
-    let availableModels = [];
-    try {
-      const listUrl = "https://generativelanguage.googleapis.com/v1/models?key=" + GEMINI_API_KEY;
-      const listRes = await ax.get(listUrl);
-      availableModels = listRes.data.models
-        .filter(function(m) { return m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"); })
-        .map(function(m) { return m.name.replace("models/", ""); });
-      console.log("Acik modeller:", availableModels.slice(0,5).join(", "));
-    } catch (e) {
-      console.log("Model listesi alinamadi, hardcoded denenecek");
-    }
+    const models = [
+      "openai/gpt-oss-120b",
+      "openai/gpt-oss-20b",
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant"
+    ];
 
-    const tryList = [].concat(availableModels, [
-      "gemini-2.0-flash-001",
-      "gemini-2.0-flash-lite-001",
-      "gemini-1.5-flash-001",
-      "gemini-1.5-flash-8b",
-      "gemini-1.5-flash-002",
-      "gemini-1.5-pro-001"
-    ]);
-
-    for (let i = 0; i < tryList.length; i++) {
-      const modelName = tryList[i];
+    for (const model of models) {
       try {
-        const url = "https://generativelanguage.googleapis.com/v1/models/" + modelName + ":generateContent?key=" + GEMINI_API_KEY;
-        const response = await ax.post(url, {
-          contents: [{ role: "user", parts: [{ text: SYSTEM_PROMPT + "\n\nMusteri: " + userMessage + "\nDanisman:" }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 600 }
-        }, { headers: { 'Content-Type': 'application/json' } });
+        const url = "https://api.groq.com/openai/v1/chat/completions";
+        const res = await axios.post(url, {
+          model: model,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: userMessage }
+          ],
+          temperature: 0.85,
+          max_tokens: 600
+        }, {
+          headers: { 'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json' }
+        });
 
-        const cand = response.data && response.data.candidates && response.data.candidates[0];
-        const text = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
+        const text = res.data.choices && res.data.choices[0] && res.data.choices[0].message && res.data.choices[0].message.content;
         if (text) {
-          console.log("Gemini calisti: " + modelName + " (REST v1)");
+          console.log("Groq calisti: " + model);
           return text.slice(0, 900);
         }
       } catch (err) {
         const msg = err.response && err.response.data && err.response.data.error ? err.response.data.error.message : err.message;
-        console.log("Model " + modelName + " olmadi: " + (msg ? msg.slice(0,100) : "hata"));
+        console.log("Model " + model + " olmadi: " + (msg ? msg.slice(0,120) : "hata"));
         continue;
       }
     }
-    throw new Error("Tum modeller kapali");
+    throw new Error("Tum Groq modelleri kapali");
   } catch (err) {
-    console.log("Yedek satis mesajina dusuyor");
-    const lower = userMessage.toLowerCase();
-    if (lower.includes("botox") || lower.includes("botoks") || lower.includes("marka")) {
-      return "Merhabalar, 5 bolge botox Allergan 3800 TL (Juvederm'in botoxu, ilk cikan marka), Dysport 4400 TL nakit. Ikisinde de mezoterapi hediye. Pazar gunu saat 13:30 size uygun olur mu?";
-    }
-    if (lower.includes("dudak") || lower.includes("russian")) return "Dudak dolgusu Russian Lips Elasty/Tuscan 3800 TL, Juvederm 5400 TL. Pazar 13:30 uyar mi?";
-    if (lower.includes("radie") || lower.includes("radiesse") || lower.includes("novuma")) return "Radiesse 19000 TL, Novuma 14000 TL nakit. Pazar 13:30 icin randevu olusturalim mi? Detay icin 0534 248 94 70.";
-    return "Merhabalar, 5 bolge botox Allergan 3800 TL, Dysport 4400 TL nakit, her sey dahil mezoterapiler hediye. Pazar 13:30 size uygun olur mu? Olmazsa Pazar 13:00-15:00, Pazartesi 16:30-19:00, Cumartesi 13:00-16:00 bakabiliriz.";
+    console.log("Yedek satis mesaji");
+    return "Canim bu konuda en detayli bilgiyi 0534 248 94 70 uzman doktorumuzu hemen arayarak alabilirsiniz, size ozel en dogru bilgiyi verecektir. Hocamizin eli cok hafif, gelen herkes cok memnun ben kendim sahidim.";
   }
 }
 
-app.get('/webhook', function(req, res) {
+app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -124,19 +115,18 @@ app.get('/webhook', function(req, res) {
   return res.sendStatus(403);
 });
 
-app.post('/webhook', async function(req, res) {
+app.post('/webhook', async (req, res) => {
   const body = req.body;
   if (body.object === 'instagram' || body.object === 'page') {
     res.status(200).send('EVENT_RECEIVED');
-    for (let j = 0; j < body.entry.length; j++) {
-      const entry = body.entry[j];
+    for (const entry of body.entry) {
       const messagingEvent = entry.messaging ? entry.messaging[0] : null;
       if (messagingEvent && messagingEvent.message && messagingEvent.message.text) {
-        if (messagingEvent.message.is_echo) { console.log('i Echo atlandi'); continue; }
+        if (messagingEvent.message.is_echo) continue;
         const senderId = messagingEvent.sender.id;
         const receivedMessage = messagingEvent.message.text;
         console.log("Gelen Mesaj [IGSID: " + senderId + "]: " + receivedMessage);
-        const replyText = await getGeminiReply(receivedMessage);
+        const replyText = await getGroqReply(receivedMessage);
         await sendInstagramMessage(senderId, replyText);
       }
     }
@@ -146,12 +136,12 @@ app.post('/webhook', async function(req, res) {
 async function sendInstagramMessage(recipientId, text) {
   try {
     const url = "https://graph.facebook.com/v20.0/" + IG_ID + "/messages";
-    const response = await ax.post(url, { recipient: { id: recipientId }, message: { text: text } }, { params: { access_token: PAGE_ACCESS_TOKEN }, headers: { 'Content-Type': 'application/json' } });
+    const response = await axios.post(url, { recipient: { id: recipientId }, message: { text: text } }, { params: { access_token: PAGE_ACCESS_TOKEN }, headers: { 'Content-Type': 'application/json' } });
     console.log("Gonderildi: \"" + text.slice(0,80) + "...\" | ID: " + response.data.message_id);
   } catch (error) {
     console.error('Mesaj gonderme hatasi:', error.response ? JSON.stringify(error.response.data) : error.message);
   }
 }
 
-app.get('/', function(req, res) { res.send('Bot Aktif! GuGu Clinic'); });
-app.listen(PORT, function() { console.log("Sunucu " + PORT + " portunda dinleniyor..."); });
+app.get('/', (req, res) => { res.send('Bot Aktif! GuGu Clinic - Elif v14'); });
+app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Elif v14 Final hazir - Elif isimli"); });
