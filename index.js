@@ -13,6 +13,22 @@ const PORT = process.env.PORT || 10000;
 const recentMessages = new Map();
 const greetedUsers = new Map();
 const userContext = new Map();
+const chatHistory = new Map();
+
+function sleep(ms) {
+  return new Promise(function (r) { setTimeout(r, ms); });
+}
+
+function addHistory(senderId, role, content) {
+  const h = chatHistory.get(senderId) || [];
+  h.push({ role: role, content: content });
+  while (h.length > 6) h.shift();
+  chatHistory.set(senderId, h);
+}
+
+function getHistory(senderId) {
+  return chatHistory.get(senderId) || [];
+}
 
 function isDuplicate(senderId, text) {
   const key = senderId + ":" + text.trim().toLowerCase();
@@ -67,6 +83,18 @@ function splitToMessages(text) {
   return result.map(function (s) { return s.slice(0, 900); });
 }
 
+async function sendTyping(recipientId) {
+  try {
+    await axios.post(
+      "https://graph.facebook.com/v20.0/" + IG_ID + "/messages",
+      { recipient: { id: recipientId }, sender_action: "typing_on" },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+  } catch (e) {
+    console.log("Typing hatasi: " + e.message);
+  }
+}
+
 async function sendSplitMessages(recipientId, text) {
   const msgs = splitToMessages(text);
   for (let i = 0; i < msgs.length; i++) {
@@ -77,7 +105,7 @@ async function sendSplitMessages(recipientId, text) {
     );
     console.log("Gonderildi [" + (i + 1) + "/" + msgs.length + "]: " + msgs[i]);
     if (i < msgs.length - 1) {
-      await new Promise(function (r) { setTimeout(r, 800 + Math.random() * 500); });
+      await sleep(800 + Math.random() * 500);
     }
   }
 }
@@ -97,7 +125,7 @@ TANISMA:
 - Konusma devam ediyorsa tekrar kendini tanitma. Mesaj sadece emoji ise merhaba deme.
 
 DOKTOR (sadece "doktor mu yapiyor, kim yapiyor, hocamiz kim, tecrubeli mi, uzman mi" diye sorulursa):
-"Tum uygulamalarimizi Hocamiz Dr Özgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir." Fiyat sorulunca doktor bilgisi ekleme.
+"Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir." Fiyat sorulunca doktor bilgisi ekleme.
 
 ADRES (sadece sorulursa):
 "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb 📍"
@@ -137,8 +165,12 @@ FIYATLAR (guncel, sadece sorulan hizmeti soyle, "nakit" kelimesini mutlaka kulla
 - Kampanya: x6 Ip Aski + 2 ML Sivi Yuz Germe 16000 TL nakit, x8 Ip Aski + 2 ML Sivi Yuz Germe 18000 TL nakit
 - Fiyatlar Alsancak ve Alacati/Cesme subelerinde ayni.
 
+GENEL SORULAR:
+- Musteri listede olmayan genel bir soru sorarsa (cilt bakimi, estetik hakkinda genel merak, nasil yapilir, aci verir mi, kac seans gibi) kendi bilginle dogal ve sicak sekilde 2-3 cumleyle cevap ver, sonra klinige davet et.
+- Her zaman telefona yonlendirme. Sadece fiyat, kampanya veya tibbi karar gerektiren konularda yonlendir.
+
 SINIRLAR:
-- Listede olmayan fiyat, hizmet veya kampanyayi UYDURMA. Emin degilsen: "Bu konuda detayli bilgi icin 0534 248 94 70'ten arayabilirsiniz."
+- Listede olmayan FIYAT veya KAMPANYAYI uydurma. Fiyat konusunda emin degilsen: "Guncel fiyat icin 0534 248 94 70'ten ulasabilirsiniz."
 - Tibbi tavsiye, tani, ilac/hamilelik/alerji gibi saglik sorularinda yorum yapma, doktorumuzla gorusmeye veya telefona yonlendir.
 - "Kesin sonuc", "risksiz", "%100" gibi garanti ifadeleri kullanma.
 - Diger klinikleri kotuleme.
@@ -166,7 +198,6 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     return "Tesekkurler, sizi klinigimizde gormekten memnuniyet duyariz. ✨";
   }
 
-  // Kas kaldirma / goz cekme tespiti
   const kasKaldirma = /ka[sş][ıi]?\s*(kald[ıi]r|kald[ıi]rma|yukar)/.test(lower);
   const gozCekme = /g[oö]z\s*(çekme|cekme|çekik|cekik|kald[ıi]r)/.test(lower) ||
     lower.includes("çekiklik") || lower.includes("cekiklik") ||
@@ -223,13 +254,11 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     return "Evet, su an musaitligimiz " + MUSAITLIK_TAM;
   }
 
-  // Botox ile kas kaldirma -> kaldirma dozu cevabi
   if (botoxVar && kasKaldirma) {
     updateContext(senderId, "botox");
     return "Botox yaparken kaslarin ucundan kaldirma dozu da veriyoruz. 😊";
   }
 
-  // Daha fazla cekiklik / goz cekme / botoxsuz kas kaldirma -> Badem Goz
   if (
     lower.includes("badem goz") || lower.includes("badem göz") ||
     gozCekme || kasKaldirma
@@ -289,7 +318,6 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     return "Burun dolgusu 5200 TL nakit. 😊";
   }
 
-  // Somon DNA / Paris Isiltisi nedir
   if (
     (lower.includes("paris") || lower.includes("somon")) &&
     (lower.includes("nedir") || lower.includes("ne ise yar") ||
@@ -375,7 +403,7 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   }
 
   try {
-    const models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+    const models = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "llama-3.1-8b-instant"];
     for (const model of models) {
       try {
         const systemContent =
@@ -383,17 +411,24 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
           "\nGreeted:" + (isGreeted ? "EVET - merhaba deme" : "HAYIR") +
           " LastTopic:" + (ctx ? ctx.lastTopic : "yok");
 
+        const messages = [{ role: "system", content: systemContent }]
+          .concat(getHistory(senderId))
+          .concat([{ role: "user", content: userMessage }]);
+
+        const reqBody = {
+          model: model,
+          messages: messages,
+          temperature: 0.6,
+          max_tokens: 1200
+        };
+        if (model.startsWith("openai/gpt-oss")) {
+          reqBody.reasoning_effort = "low";
+          reqBody.max_tokens = 2000;
+        }
+
         const res = await axios.post(
           "https://api.groq.com/openai/v1/chat/completions",
-          {
-            model: model,
-            messages: [
-              { role: "system", content: systemContent },
-              { role: "user", content: userMessage }
-            ],
-            temperature: 0.5,
-            max_tokens: 400
-          },
+          reqBody,
           {
             headers: {
               'Authorization': 'Bearer ' + GROQ_API_KEY,
@@ -403,7 +438,7 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
         );
 
         let text = res.data.choices[0].message.content;
-        if (text) {
+        if (text && text.trim()) {
           console.log("Groq calisti: " + model);
           text = text.replace(/1988.*?(mezunu|Ege).*?/gi, "");
           if (isGreeted) {
@@ -411,14 +446,61 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
           }
           return text.slice(0, 800).trim();
         }
+        console.log("Groq bos cevap: " + model);
       } catch (e) {
-        console.log("Groq hata: " + model + " " + e.message);
+        const detay = e.response ? e.response.status + " " + JSON.stringify(e.response.data) : e.message;
+        console.log("Groq hata: " + model + " " + detay);
         continue;
       }
     }
     throw new Error("kapali");
   } catch (err) {
     return "Bu konuda detayli bilgi icin 0534 248 94 70'ten arayabilirsiniz. 😊";
+  }
+}
+
+async function handleMessage(m) {
+  try {
+    if (!m || !m.message) return;
+    if (m.message.is_echo) {
+      console.log("Echo atlandi: " + (m.message.text || "").slice(0, 80));
+      return;
+    }
+    if (!m.message.text) return;
+
+    const senderId = m.sender.id;
+    const text = m.message.text;
+
+    if (isDuplicate(senderId, text)) {
+      console.log("Duplicate atlandi");
+      return;
+    }
+
+    const ctxNow = getContext(senderId);
+    console.log("Gelen Mesaj: " + text + " | Context: " + (ctxNow ? ctxNow.lastTopic : "yok"));
+
+    const isGreeted = greetedUsers.has(senderId);
+    const baslangic = Date.now();
+
+    await sendTyping(senderId);
+
+    const reply = await getGroqReply(text, senderId, isGreeted);
+    if (!isGreeted) greetedUsers.set(senderId, Date.now());
+    addHistory(senderId, "user", text);
+    addHistory(senderId, "assistant", reply);
+
+    // Toplam bekleme 10-22 sn, cevap hazirlama suresi bundan dusulur
+    const hedefMs = 10000 + Math.random() * 12000;
+    const kalan = Math.max(0, hedefMs - (Date.now() - baslangic));
+    const ilkYari = kalan / 2;
+
+    await sleep(ilkYari);
+    await sendTyping(senderId);
+    await sleep(kalan - ilkYari);
+
+    await sendSplitMessages(senderId, reply);
+  } catch (e) {
+    console.log("Mesaj isleme hatasi: " + e.message);
   }
 }
 
@@ -432,32 +514,15 @@ app.get('/webhook', function (req, res) {
   return res.sendStatus(403);
 });
 
-app.post('/webhook', async function (req, res) {
+app.post('/webhook', function (req, res) {
   const body = req.body;
   if (body.object === 'instagram' || body.object === 'page') {
     res.status(200).send('EVENT_RECEIVED');
-    for (const entry of body.entry) {
-      try {
-        const m = entry.messaging ? entry.messaging[0] : null;
-        if (m && m.message) {
-          if (m.message.is_echo) {
-            console.log("Echo atlandi: " + (m.message.text || "").slice(0, 80));
-            continue;
-          }
-          if (!m.message.text) continue;
-          if (isDuplicate(m.sender.id, m.message.text)) {
-            console.log("Duplicate atlandi");
-            continue;
-          }
-          const ctxNow = getContext(m.sender.id);
-          console.log("Gelen Mesaj: " + m.message.text + " | Context: " + (ctxNow ? ctxNow.lastTopic : "yok"));
-          const isGreeted = greetedUsers.has(m.sender.id);
-          const reply = await getGroqReply(m.message.text, m.sender.id, isGreeted);
-          if (!isGreeted) greetedUsers.set(m.sender.id, Date.now());
-          await sendSplitMessages(m.sender.id, reply);
-        }
-      } catch (e) {
-        console.log("Mesaj isleme hatasi: " + e.message);
+    for (const entry of (body.entry || [])) {
+      const list = entry.messaging || [];
+      for (const m of list) {
+        // await yok: her mesaj ayri calisir, birbirini beklemez
+        handleMessage(m);
       }
     }
   } else {
@@ -466,9 +531,9 @@ app.post('/webhook', async function (req, res) {
 });
 
 app.get('/', function (req, res) {
-  res.send('Bot Aktif! Aida v42 - Guncel Prompt - Emoji - Guncel Fiyatlar');
+  res.send('Bot Aktif! Aida v43 - Hafiza - Yaziyor Gostergesi - Gecikme');
 });
 
 app.listen(PORT, function () {
-  console.log("Sunucu " + PORT + " portunda... Aida v42 - Guncel Prompt - Emoji - Guncel Fiyatlar");
+  console.log("Sunucu " + PORT + " portunda... Aida v43 - Hafiza - Yaziyor Gostergesi - Gecikme");
 });
