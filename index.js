@@ -60,6 +60,11 @@ GOZ ALTI: 5200 TL kampanya, normal 7000 TL
 PARIS/SOMON/GENCLIK: Hepsi bir arada 3500 TL
 SAKAK: 4500 TL
 
+CALISMA SAATLERI KURALI - COK ONEMLI - ASLA KISITLI GOSTERME:
+- ASLA "Pazartesi - Cuma 09:00 - 19:00", "Cumartesi 10:00 - 18:00" gibi genel calisma saati uydurma, yasak.
+- Clinic acik mi, geliyorum, musait misiniz, ne zaman aciksiniz gibi sorularda HER ZAMAN su 4 saati soyle: "Alsancak subemizde size Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri uygun, hangisi size uyar? Alacati/Cesme icin Persembe 17:00-18:30"
+- Asla kisitli gosterme, her zaman musaitlik var de, bu saatleri ilet.
+
 RANDEVU: Sadece randevu sorulursa soyle: Alacati Persembe 17:00-18:30, Alsancak Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00, Carsamba 16:30-19:00
 
 FIYAT LISTESI:
@@ -77,6 +82,9 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   const lower = userMessage.toLowerCase();
   if (isOnlyEmoji(userMessage)) return "Tesekkurler, her zaman yazabilirsiniz. Sizi klinigimizde gormekten memnuniyet duyariz.";
   if (lower.includes("adres") || lower.includes("konum") || lower.includes("nerede")) return "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb. Sizi bekliyoruz.";
+  if (lower.includes("acik mi") || lower.includes("acikmi") || lower.includes("geliyorum") || lower.includes("musait misiniz") || lower.includes("calisiyor musunuz") || lower.includes("ne zaman acik") || lower.includes("bugun acik")) {
+    return "Evet, bekliyoruz. Alsancak subemizde size Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri uygun, hangisi size uyar? Alacati/Cesme icin Persembe 17:00-18:30 gelebilirsiniz.";
+  }
   if ((lower.includes("nazolabial") || lower.includes("nazalobial") || lower.includes("nazobial")) && lower.includes("dolgu")) {
     return "Nazolabial dolgu 1 cc 3800 TL nakit odeme, kredi karti 5400 TL. Normal fiyatimizdir, kampanyasizdir.";
   }
@@ -176,5 +184,5 @@ app.post('/webhook', async (req, res) => {
   } else res.sendStatus(404);
 });
 
-app.get('/', (req, res) => { res.send('Bot Aktif! Aida v25 - Dr Ozgen Yildirim - 36 sene tecrube'); });
-app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Aida v25 Final - Dr Ozgen Yildirim - 36 sene tecrube - Merhaba loop fix"); });
+app.get('/', (req, res) => { res.send('Bot Aktif! Aida v26 - Dr Ozgen - Calisma saatleri fix'); });
+app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Aida v26 Final - Dr Ozgen - Calisma saatleri fix - 09:00-19:00 yasak"); });
