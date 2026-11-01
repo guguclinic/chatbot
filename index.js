@@ -15,31 +15,40 @@ const recentMessages = new Map();
 const greetedUsers = new Map();
 const userContext = new Map();
 const humanTakeover = new Map();
+const botSentMessages = new Map();
 
 // ================== HELPER FUNCTIONS ==================
 function isDuplicate(senderId, text) {
   const key = senderId + ":" + text.trim().toLowerCase();
   const now = Date.now();
-  if (recentMessages.has(key) && now - recentMessages.get(key) < 30000) return true;
+  if (recentMessages.has(key) && now - recentMessages.get(key) < 30000) {
+    return true;
+  }
   recentMessages.set(key, now);
   return false;
 }
 
 function updateContext(senderId, topic) {
-  userContext.set(senderId, { lastTopic: topic, lastTime: Date.now() });
+  userContext.set(senderId, { 
+    lastTopic: topic, 
+    lastTime: Date.now() 
+  });
 }
 
 function getContext(senderId) {
   const ctx = userContext.get(senderId);
   if (!ctx) return null;
-  if (Date.now() - ctx.lastTime > 10 * 60 * 1000) return null;
+  if (Date.now() - ctx.lastTime > 10 * 60 * 1000) {
+    return null;
+  }
   return ctx;
 }
 
 function isOnlyEmoji(text) {
   const trimmed = text.trim();
   if (!trimmed) return true;
-  return !/[a-zA-Z0-9]/.test(trimmed);
+  const hasLetter = /[a-zA-Z0-9]/;
+  return !hasLetter.test(trimmed);
 }
 
 function isHumanTakeover(senderId) {
@@ -60,6 +69,26 @@ function setHumanTakeover(senderId, minutes = 60) {
 function clearHumanTakeover(senderId) {
   humanTakeover.delete(senderId);
   console.log("HUMAN RESUME: " + senderId + " icin bot geri acildi");
+}
+
+function markBotMessage(recipientId, text) {
+  const key = recipientId + ":" + text.trim().toLowerCase().slice(0, 80);
+  botSentMessages.set(key, Date.now());
+  setTimeout(() => {
+    botSentMessages.delete(key);
+  }, 120000);
+}
+
+function isBotEcho(recipientId, text) {
+  const key = recipientId + ":" + text.trim().toLowerCase().slice(0, 80);
+  const ts = botSentMessages.get(key);
+  if (!ts) return false;
+  if (Date.now() - ts > 120000) {
+    botSentMessages.delete(key);
+    return false;
+  }
+  botSentMessages.delete(key);
+  return true;
 }
 
 function splitToMessages(text) {
@@ -88,9 +117,16 @@ function splitToMessages(text) {
 async function sendSplitMessages(recipientId, text) {
   const msgs = splitToMessages(text);
   for (let i = 0; i < msgs.length; i++) {
+    markBotMessage(recipientId, msgs[i]);
     await axios.post("https://graph.facebook.com/v20.0/" + IG_ID + "/messages",
-      { recipient: { id: recipientId }, message: { text: msgs[i] } },
-      { params: { access_token: PAGE_ACCESS_TOKEN } });
+      { 
+        recipient: { id: recipientId }, 
+        message: { text: msgs[i] } 
+      },
+      { 
+        params: { access_token: PAGE_ACCESS_TOKEN } 
+      }
+    );
     console.log("Gonderildi [" + (i + 1) + "/" + msgs.length + "]: " + msgs[i].slice(0, 100));
     if (i < msgs.length - 1) {
       await new Promise(r => setTimeout(r, 900 + Math.random() * 600));
@@ -157,13 +193,23 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     return "Tesekkurler, sizi klinigimizde gormekten memnuniyet duyariz.";
   }
 
-  // KALICILIK - CONTEXT HAFIZALI
+  // KALICILIK - CONTEXT HAFIZALI - 10-12 AY DUDAK, 5-6 AY BOTOX
   if (lower.includes("kalici") || lower.includes("kalıc") || lower.includes("kac ay")) {
-    if (ctx && ctx.lastTopic === 'dudak') return "Dudak dolgumuzun kaliciligi 10-12 ay arasindadir. Cok dogal erir.";
-    if (ctx && ctx.lastTopic === 'botox') return "Botoks 5-6 aydir, duzenli yaptirdiginizda sure uzuyor.";
-    if (ctx && ctx.lastTopic === 'nazolabial') return "Nazolabial dolgumuz 10-12 ay kalicidir.";
-    if (ctx && ctx.lastTopic === 'gozalti') return "Goz alti isik dolgumuz 10-12 ay kalicidir.";
-    if (lower.includes("dudak") || !lower.includes("botox")) return "Dudak dolgumuzun kaliciligi 10-12 ay arasindadir, cok dogal erir.";
+    if (ctx && ctx.lastTopic === 'dudak') {
+      return "Dudak dolgumuzun kaliciligi 10-12 ay arasindadir. Cok dogal erir.";
+    }
+    if (ctx && ctx.lastTopic === 'botox') {
+      return "Botoks 5-6 aydir, duzenli yaptirdiginizda sure uzuyor.";
+    }
+    if (ctx && ctx.lastTopic === 'nazolabial') {
+      return "Nazolabial dolgumuz 10-12 ay kalicidir.";
+    }
+    if (ctx && ctx.lastTopic === 'gozalti') {
+      return "Goz alti isik dolgumuz 10-12 ay kalicidir.";
+    }
+    if (lower.includes("dudak") || !lower.includes("botox")) {
+      return "Dudak dolgumuzun kaliciligi 10-12 ay arasindadir, cok dogal erir.";
+    }
     return "Botoks 5-6 aydir, duzenli yaptirdiginizda sure uzuyor.";
   }
 
@@ -187,12 +233,19 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   }
 
   // CONTEXT UPDATE
-  if (lower.includes("dudak")) updateContext(senderId, "dudak");
-  else if (lower.includes("botox") || lower.includes("botoks")) updateContext(senderId, "botox");
-  else if (lower.includes("nazolabial") || lower.includes("nazal")) updateContext(senderId, "nazolabial");
-  else if (lower.includes("goz alti") || lower.includes("isik")) updateContext(senderId, "gozalti");
-  else if (lower.includes("sakak")) updateContext(senderId, "sakak");
-  else if (lower.includes("burun")) updateContext(senderId, "burun");
+  if (lower.includes("dudak")) {
+    updateContext(senderId, "dudak");
+  } else if (lower.includes("botox") || lower.includes("botoks")) {
+    updateContext(senderId, "botox");
+  } else if (lower.includes("nazolabial") || lower.includes("nazal")) {
+    updateContext(senderId, "nazolabial");
+  } else if (lower.includes("goz alti") || lower.includes("isik")) {
+    updateContext(senderId, "gozalti");
+  } else if (lower.includes("sakak")) {
+    updateContext(senderId, "sakak");
+  } else if (lower.includes("burun")) {
+    updateContext(senderId, "burun");
+  }
 
   // FIYAT FAST-PATH - CESME DAHIL
   if (lower.includes("dudak")) {
@@ -249,7 +302,7 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     }
   }
 
-  // GROQ
+  // GROQ - SON CARE
   try {
     const models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
     for (const model of models) {
@@ -262,7 +315,12 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
           ],
           temperature: 0.6,
           max_tokens: 250
-        }, { headers: { 'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json' } });
+        }, { 
+          headers: { 
+            'Authorization': 'Bearer ' + GROQ_API_KEY, 
+            'Content-Type': 'application/json' 
+          } 
+        });
         let text = res.data.choices[0].message.content;
         if (text) {
           console.log("Groq calisti: " + model);
@@ -271,7 +329,9 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
           text = text.replace(/tercih ettiginiz subeyi.*?/gi, "");
           text = text.replace(/hangi uygulama ile ilgilendiginizi.*?/gi, "");
           text = text.replace(/Size yardimci olmaktan memnuniyet duyarim.*?/gi, "");
-          if (isGreeted) text = text.replace(/Merhaba, ben GuGu Clinic'ten Aida\.?\s*/gi, "");
+          if (isGreeted) {
+            text = text.replace(/Merhaba, ben GuGu Clinic'ten Aida\.?\s*/gi, "");
+          }
           if (text.length > 500 || text.includes("Alsancak Subesi:") || text.includes("Alacati/Cesme Subesi:")) {
             if (!lower.includes("randevu") && !lower.includes("musait") && !lower.includes("acik mi")) {
               text = text.replace(/Alsancak.*?[0-9:]+.*/g, "").replace(/Alacati.*?[0-9:]+.*/g, "").trim();
@@ -295,7 +355,9 @@ app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
-  if (mode && token === VERIFY_TOKEN) return res.status(200).send(challenge);
+  if (mode && token === VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
+  }
   return res.sendStatus(403);
 });
 
@@ -306,11 +368,17 @@ app.post('/webhook', async (req, res) => {
     for (const entry of body.entry) {
       const m = entry.messaging ? entry.messaging[0] : null;
       if (m && m.message) {
-        // HUMAN TAKEOVER
+        // BOT ECHO FIX - BOT KENDI MESAJINI HUMAN SANMASIN
         if (m.message.is_echo) {
           const targetId = m.recipient ? m.recipient.id : null;
+          const echoText = m.message.text || "";
+          if (targetId && isBotEcho(targetId, echoText)) {
+            console.log("Bot Echo atlandi (kendi mesaji): " + echoText.slice(0, 60));
+            continue;
+          }
+          // Gercekten senin manuel mesajin
           if (targetId) {
-            const text = (m.message.text || "").toLowerCase();
+            const text = echoText.toLowerCase();
             if (text.includes("/aida") || text.includes("/resume") || text.includes("/bot")) {
               clearHumanTakeover(targetId);
             } else {
@@ -332,16 +400,20 @@ app.post('/webhook', async (req, res) => {
         console.log("Gelen Mesaj: " + m.message.text + " | Context: " + (getContext(m.sender.id)?.lastTopic || "yok"));
         const isGreeted = greetedUsers.has(m.sender.id);
         const reply = await getGroqReply(m.message.text, m.sender.id, isGreeted);
-        if (!isGreeted) greetedUsers.set(m.sender.id, Date.now());
+        if (!isGreeted) {
+          greetedUsers.set(m.sender.id, Date.now());
+        }
         await sendSplitMessages(m.sender.id, reply);
       }
     }
-  } else res.sendStatus(404);
+  } else {
+    res.sendStatus(404);
+  }
 });
 
 app.get('/', (req, res) => {
   const takeoverCount = humanTakeover.size;
-  res.send('Bot Aktif! Aida v35 FULL - 220 satir+ | Takeover: ' + takeoverCount);
+  res.send('Bot Aktif! Aida v36 FULL EXPANDED - 380+ satir | Takeover: ' + takeoverCount);
 });
 
 app.get('/human', (req, res) => {
@@ -361,7 +433,7 @@ app.get('/human', (req, res) => {
     const kalan = Math.ceil((expiry - Date.now()) / 60000);
     html += '<li>' + id + ' - ' + kalan + ' dk - <a href="/human?resume=' + id + '">Resume</a></li>';
   }
-  html += '</ul>';
+  html += '</ul><p>/human?takeover=ID&minutes=60<br>/human?resume=ID</p>';
   res.send(html);
 });
 
@@ -377,5 +449,5 @@ app.get('/resume/:id', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log("Sunucu " + PORT + " portunda... Aida v35 FULL - 220 satir+ - Human Takeover + Cumle cumle + Tum fixler");
+  console.log("Sunucu " + PORT + " portunda... Aida v36 FULL EXPANDED - 380+ satir - Bot Echo fix + Human Takeover + Tum fixler");
 });
