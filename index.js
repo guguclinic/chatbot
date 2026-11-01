@@ -1,3 +1,5 @@
+
+
 const express = require('express');
 const axios = require('axios');
 
@@ -14,8 +16,6 @@ const PORT = process.env.PORT || 10000;
 const recentMessages = new Map();
 const greetedUsers = new Map();
 const userContext = new Map();
-const humanTakeover = new Map();
-const botSentMessages = new Map();
 
 // ================== HELPER FUNCTIONS ==================
 function isDuplicate(senderId, text) {
@@ -51,63 +51,18 @@ function isOnlyEmoji(text) {
   return !hasLetter.test(trimmed);
 }
 
-function isHumanTakeover(senderId) {
-  const expiry = humanTakeover.get(senderId);
-  if (!expiry) return false;
-  if (Date.now() > expiry) {
-    humanTakeover.delete(senderId);
-    return false;
-  }
-  return true;
-}
-
-function setHumanTakeover(senderId, minutes = 60) {
-  humanTakeover.set(senderId, Date.now() + minutes * 60 * 1000);
-  console.log("HUMAN TAKEOVER: " + senderId + " icin bot " + minutes + " dk sustu");
-}
-
-function clearHumanTakeover(senderId) {
-  humanTakeover.delete(senderId);
-  console.log("HUMAN RESUME: " + senderId + " icin bot geri acildi");
-}
-
-function markBotMessage(recipientId, text) {
-  const key = recipientId + ":" + text.trim().toLowerCase().slice(0, 80);
-  botSentMessages.set(key, Date.now());
-  setTimeout(() => {
-    botSentMessages.delete(key);
-  }, 120000);
-}
-
-function isBotEcho(recipientId, text) {
-  if (!text) return false;
-  const now = Date.now();
-  const lowerEcho = text.trim().toLowerCase();
-  // Tum bot mesajlarini tara, ayni recipient icin 2 dk icinde atilmis mi
-  for (let [key, ts] of botSentMessages.entries()) {
-    if (now - ts > 120000) {
-      botSentMessages.delete(key);
-      continue;
-    }
-    if (!key.startsWith(recipientId + ":")) continue;
-    const botText = key.split(":").slice(1).join(":").trim().toLowerCase();
-    // Fuzzy match: echo bot mesajinin icinde veya bot mesaji echo icinde veya ilk 30 karakter ayni
-    if (lowerEcho.includes(botText.slice(0,30)) || botText.includes(lowerEcho.slice(0,30)) || lowerEcho.slice(0,50) === botText.slice(0,50)) {
-      botSentMessages.delete(key);
-      return true;
-    }
-  }
-  return false;
-}
-
 function splitToMessages(text) {
+  // Nokta yoksa bolme - yarim kalmasin
+  if (!text.includes('.') && !text.includes('!') && !text.includes('?')) {
+    return [text.slice(0, 900)];
+  }
   let parts = text.split(/(?<=[.!?])\s+/);
   let result = [];
   let current = "";
   for (let p of parts) {
     p = p.trim();
     if (!p) continue;
-    if ((current + " " + p).length < 130) {
+    if ((current + " " + p).length < 200) {
       current = current ? current + " " + p : p;
     } else {
       if (current) result.push(current);
@@ -126,8 +81,8 @@ function splitToMessages(text) {
 async function sendSplitMessages(recipientId, text) {
   const msgs = splitToMessages(text);
   for (let i = 0; i < msgs.length; i++) {
-    markBotMessage(recipientId, msgs[i]);
-    await axios.post("https://graph.facebook.com/v20.0/" + IG_ID + "/messages",
+    await axios.post(
+      "https://graph.facebook.com/v20.0/" + IG_ID + "/messages",
       { 
         recipient: { id: recipientId }, 
         message: { text: msgs[i] } 
@@ -136,9 +91,9 @@ async function sendSplitMessages(recipientId, text) {
         params: { access_token: PAGE_ACCESS_TOKEN } 
       }
     );
-    console.log("Gonderildi [" + (i + 1) + "/" + msgs.length + "]: " + msgs[i].slice(0, 100));
+    console.log("Gonderildi [" + (i + 1) + "/" + msgs.length + "]: " + msgs[i]);
     if (i < msgs.length - 1) {
-      await new Promise(r => setTimeout(r, 900 + Math.random() * 600));
+      await new Promise(r => setTimeout(r, 800 + Math.random() * 500));
     }
   }
 }
@@ -152,11 +107,12 @@ COK ONEMLI - INSAN GIBI KISA KONUS:
 - ASLA her mesajda gun saat listesi verme. Sadece randevu sorulunca musaitlik cumlesi ver.
 - Kurumsal, siz'li, saygili, net.
 
-TANISMA:
-- SADECE ilk merhabada "Merhaba, ben GuGu Clinic'ten Aida" de. Sonra ASLA tekrar deme.
+TANISMA KURALI - TEKRAR YOK:
+- SADECE ilk "merhaba, selam, iyi gunler" de BIR KERE: "Merhaba, ben GuGu Clinic'ten Aida" de.
+- Daha once konusulan kisiye ASLA tekrar "Merhaba ben Aida" deme.
 - Emoji gelince merhaba deme.
 
-KURUMSAL: ASLA "canim" kullanma.
+KURUMSAL: ASLA "canim" kullanma. Hep "siz" de.
 
 DOKTOR KURALI - DR OZGEN YILDIRIM - 36 SENE TECRUBE:
 - Musteri "doktor mu yapiyor, kim yapiyor, hocamiz kim, tecrubeli mi, uzman mi" diye SORARSA: "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir, gelen danisanlarimizin hepsi cok memnun."
@@ -169,19 +125,19 @@ MUSAITLIK CUMLESI - SADECE RANDEVU SORULUNCA:
 - "su an musaitligimiz Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar?"
 - Her fiyat mesajinda bunu yazma!
 
-KALICILIK:
+KALICILIK - GUNCEL:
 - Dudak dolgusu 10-12 ay
 - Nazolabial 10-12 ay
 - Goz alti isik dolgusu 10-12 ay
 - Botox 5-6 ay duzenli yaptiranlarda uzar
 
-FIYAT - SADECE SORULANI SOYLE:
+FIYAT - SADECE SORULANI SOYLE - NAKIT KELIMESI MUTLAKA:
 - Nazolabial: 1 cc 3800 TL nakit 5400 TL KK normal fiyat kampanyasiz
 - Dudak 1cc: Elasty/Tuscan 3800 TL nakit KK 5400, Juvederm 5400 TL nakit KK 7800
-- Yarim cc sadece sorulunca: 2200 TL / 3000 TL
-- Sakak 4500 TL, Burun 5200 TL, Goz alti 5200 TL kampanya normal 7000 TL, Paris+Somon+Genclik 3500 TL
-- Botox 5 Bolge: Allergan 3800 TL nakit Dysport 4400 TL nakit Hediye Somon DNA + Paris Isiltisi - HER ZAMAN nakit kelimesi yaz
-- Sivi Yuz: Full Face 21000 TL, Cene 3800 TL, Burun 5200 TL, Sakak 4500 TL
+- Yarim cc sadece sorulunca: 2200 TL nakit / 3000 TL nakit
+- Sakak 4500 TL nakit, Burun 5200 TL nakit, Goz alti 5200 TL kampanya normal 7000 TL, Paris+Somon+Genclik 3500 TL nakit
+- Botox 5 Bolge: Allergan 3800 TL nakit Dysport 4400 TL nakit Hediye Somon DNA + Paris Isiltisi
+- Sivi Yuz: Full Face 21000 TL nakit, Cene 3800 TL nakit, Burun 5200 TL nakit, Sakak 4500 TL nakit
 - Radiesse 19000, Novuma 14000, Badem Goz 18000, Ip Aski 6 adet 16000 KK 22000 8 adet 18000 KK 25000
 
 RANDEVU ONAYI - ISIM TELEFON:
@@ -197,8 +153,14 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     return "Tesekkurler, her zaman yazabilirsiniz.";
   }
 
-  // COK IYI FIX
-  if (lower.trim().length < 20 && ["cok iyi", "çok iyi", "super", "süper", "harika", "mukemmel", "mükemmel", "cok guzel", "çok güzel", "sahane", "şahane", "tesekkur", "teşekkür", "teşekkürler", "tesekkurler", "tamam", "ok", "okey", "tamamdir"].includes(lower.trim())) {
+  // COK IYI / TESEKKUR FIX
+  if (lower.trim().length < 25 && [
+    "cok iyi", "çok iyi", "super", "süper", "harika", 
+    "mukemmel", "mükemmel", "cok guzel", "çok güzel", 
+    "sahane", "şahane", "tesekkur", "teşekkür", 
+    "teşekkürler", "tesekkurler", "tamam", "ok", 
+    "okey", "tamamdir", "sagol", "sağol", "eyvallah"
+  ].includes(lower.trim())) {
     return "Tesekkurler, sizi klinigimizde gormekten memnuniyet duyariz.";
   }
 
@@ -256,80 +218,104 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     updateContext(senderId, "burun");
   }
 
-  // FIYAT FAST-PATH - CESME DAHIL
+  // DUDAK FIYAT - YAZIM HATASI DA DAHIL
   if (lower.includes("dudak")) {
-    if (lower.includes("fiyat") || lower.includes("ne kadar") || lower.includes("ucret") || lower.includes("kac tl") || lower.includes("kaç tl") || lower.includes("alacati") || lower.includes("alaçatı") || lower.includes("cesme") || lower.includes("çeşme") || lower.includes("alsancak")) {
+    if (lower.includes("fiyat") || lower.includes("ne kad") || lower.includes("kadr") || lower.includes("kdr") || lower.includes("ucret") || lower.includes("tl") || lower.includes("kac") || lower.includes("kaç") || lower.includes("alacati") || lower.includes("cesme") || lower.includes("dudak dolgusu") || lower.includes("dudak dolgusu ne")) {
       return "Dudak dolgusu 1 cc Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL). Fiyatlarimiz her iki subemizde de ayni.";
     }
   }
 
+  // NAZOLABIAL
   if (lower.includes("nazolabial") || lower.includes("nazalobial") || lower.includes("nazolab")) {
     return "Nazolabial dolgu 1 cc 3800 TL nakit, 5400 TL KK. Normal fiyat.";
   }
 
+  // YARIM CC
   if (lower.includes("yarim") && (lower.includes("cc") || lower.includes("dudak"))) {
     return "Evet yarim yapiyoruz. Yarim cc Elasty 2200 TL nakit, Juvederm 3000 TL nakit. 1 cc Elasty 3800 TL KK 5400, Juvederm 5400 TL KK 7800.";
   }
 
+  // SAKAK
   if (lower.includes("sakak") && !lower.includes("dudak") && !lower.includes("nazo")) {
     return "Sakak dolgusu 4500 TL nakit.";
   }
 
+  // BURUN
   if (lower.includes("burun") && lower.includes("dolgu")) {
     return "Burun dolgusu 5200 TL nakit.";
   }
 
+  // PARIS SOMON GENCLIK
   if (lower.includes("paris") || lower.includes("somon") || lower.includes("genclik")) {
     return "Paris Isiltisi, Somon DNA ve Genclik Asisi hepsi bir arada 3500 TL nakit kampanya.";
   }
 
+  // DOKTOR
   if (lower.includes("doktor mu") || lower.includes("kim yapiyor") || lower.includes("tecrubeli") || lower.includes("hocamiz kim") || lower.includes("uzman mi")) {
     return "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir.";
   }
 
+  // GOZ ALTI
   if (lower.includes("goz alti") || lower.includes("isik dolgu") || lower.includes("gozalti")) {
     return "Goz alti isik dolgusu 5200 TL kampanya, normal 7000 TL.";
   }
 
+  // KOMBIN - SAKAK DUDAK NAZOLABIAL
   if ((lower.includes("sakak") || lower.includes("saka")) && lower.includes("dudak") && (lower.includes("nazol") || lower.includes("nazal"))) {
     return "Sakak 4500 TL nakit. Nazolabial 1 cc 3800 TL nakit KK 5400. Dudak 1 cc Elasty 3800 TL KK 5400, Juvederm 5400 TL KK 7800.";
   }
 
+  // BOTOX - SADECE BOTOX YAZSA BILE FIYAT VER
   if (lower.includes("botox") || lower.includes("botoks")) {
-    // Sadece "botox" yazsa bile fiyat ver, nakit kelimesi mutlaka olsun
-    updateContext(senderId, "botox");
     return "5 Bolge Botox Allergan 3800 TL nakit, Dysport 4400 TL nakit. Hediye Somon DNA + Paris Isiltisi.";
   }
 
-  if (lower.includes("randevu alabilir") || lower.includes("randevu al") || lower.includes("randevu nasil") || (lower.includes("randevu") && lower.length < 60)) {
+  // SIVI YUZ GERME
+  if (lower.includes("sivi yuz") || lower.includes("sıvı yüz") || (lower.includes("sivi") && lower.includes("germe"))) {
+    return "Sivi yuz germe Full Face 21000 TL nakit.";
+  }
+
+  // RANDEVU
+  if (lower.includes("randevu alabilir") || lower.includes("randevu al") || lower.includes("randevu nasil") || (lower.includes("randevu") && lower.length < 80)) {
     return "Tabii, su an musaitligimiz Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar?";
   }
 
+  // SAAT BELIRTME - 17:30 gibi
   if (lower.match(/\d{2}:\d{2}/)) {
     if (lower.includes("carsamba") || lower.includes("cumartesi") || lower.includes("pazar") || lower.includes("pazartesi") || lower.includes("persembe") || lower.includes("cesme") || lower.includes("alacati") || lower.includes("alaçatı")) {
       return "Belirttiginiz saatte randevunuzu olusturabiliriz. Isminizi ve telefon numaranizi alabilir miyim?";
     }
   }
 
-  // GROQ - SON CARE
+  // GROQ - SON CARE - max_tokens 400 - YARIM KALMASIN
   try {
     const models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
     for (const model of models) {
       try {
-        const res = await axios.post("https://api.groq.com/openai/v1/chat/completions", {
-          model: model,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT + "\nGreeted:" + (isGreeted ? "EVET - merhaba deme" : "HAYIR") + " LastTopic:" + (ctx ? ctx.lastTopic : "yok") },
-            { role: "user", content: userMessage }
-          ],
-          temperature: 0.6,
-          max_tokens: 250
-        }, { 
-          headers: { 
-            'Authorization': 'Bearer ' + GROQ_API_KEY, 
-            'Content-Type': 'application/json' 
-          } 
-        });
+        const res = await axios.post(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            model: model,
+            messages: [
+              { 
+                role: "system", 
+                content: SYSTEM_PROMPT + "\nGreeted:" + (isGreeted ? "EVET - merhaba deme" : "HAYIR") + " LastTopic:" + (ctx ? ctx.lastTopic : "yok") 
+              },
+              { 
+                role: "user", 
+                content: userMessage 
+              }
+            ],
+            temperature: 0.5,
+            max_tokens: 400
+          },
+          { 
+            headers: { 
+              'Authorization': 'Bearer ' + GROQ_API_KEY, 
+              'Content-Type': 'application/json' 
+            } 
+          }
+        );
         let text = res.data.choices[0].message.content;
         if (text) {
           console.log("Groq calisti: " + model);
@@ -346,7 +332,7 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
               text = text.replace(/Alsancak.*?[0-9:]+.*/g, "").replace(/Alacati.*?[0-9:]+.*/g, "").trim();
             }
           }
-          return text.slice(0, 600).trim();
+          return text.slice(0, 800).trim();
         }
       } catch (e) { 
         console.log("Groq hata: " + model + " " + e.message);
@@ -377,31 +363,12 @@ app.post('/webhook', async (req, res) => {
     for (const entry of body.entry) {
       const m = entry.messaging ? entry.messaging[0] : null;
       if (m && m.message) {
-        // BOT ECHO FIX - BOT KENDI MESAJINI HUMAN SANMASIN
+        // HUMAN TAKEOVER KAPATILDI - TUM ECHO'LAR ATLANIYOR
         if (m.message.is_echo) {
-          const targetId = m.recipient ? m.recipient.id : null;
-          const echoText = m.message.text || "";
-          if (targetId && isBotEcho(targetId, echoText)) {
-            console.log("Bot Echo atlandi (kendi mesaji): " + echoText.slice(0, 60));
-            continue;
-          }
-          // Gercekten senin manuel mesajin
-          if (targetId) {
-            const text = echoText.toLowerCase();
-            if (text.includes("/aida") || text.includes("/resume") || text.includes("/bot")) {
-              clearHumanTakeover(targetId);
-            } else {
-              setHumanTakeover(targetId, 60);
-            }
-          }
-          console.log("Echo (senin manuel mesajin) atlandi, takeover aktif");
+          console.log("Echo atlandi: " + (m.message.text || "").slice(0, 80));
           continue;
         }
         if (!m.message.text) continue;
-        if (isHumanTakeover(m.sender.id)) {
-          console.log("HUMAN TAKEOVER aktif, bot yazmadi: " + m.sender.id + " | Gelen: " + m.message.text);
-          continue;
-        }
         if (isDuplicate(m.sender.id, m.message.text)) {
           console.log("Duplicate atlandi");
           continue;
@@ -421,42 +388,10 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  const takeoverCount = humanTakeover.size;
-  res.send('Bot Aktif! Aida v37 FULL EXPANDED - 380+ satir | Takeover: ' + takeoverCount);
-});
-
-app.get('/human', (req, res) => {
-  const takeoverId = req.query.takeover;
-  const resumeId = req.query.resume;
-  const minutes = parseInt(req.query.minutes) || 60;
-  if (takeoverId) {
-    setHumanTakeover(takeoverId, minutes);
-    return res.send('OK - ' + takeoverId + ' icin bot ' + minutes + ' dk susturuldu.');
-  }
-  if (resumeId) {
-    clearHumanTakeover(resumeId);
-    return res.send('OK - ' + resumeId + ' icin bot geri acildi');
-  }
-  let html = '<h3>Human Takeover (' + humanTakeover.size + ')</h3><ul>';
-  for (let [id, expiry] of humanTakeover.entries()) {
-    const kalan = Math.ceil((expiry - Date.now()) / 60000);
-    html += '<li>' + id + ' - ' + kalan + ' dk - <a href="/human?resume=' + id + '">Resume</a></li>';
-  }
-  html += '</ul><p>/human?takeover=ID&minutes=60<br>/human?resume=ID</p>';
-  res.send(html);
-});
-
-app.get('/pause/:id', (req, res) => {
-  const minutes = parseInt(req.query.minutes) || 60;
-  setHumanTakeover(req.params.id, minutes);
-  res.send('Paused ' + req.params.id + ' for ' + minutes + ' min');
-});
-
-app.get('/resume/:id', (req, res) => {
-  clearHumanTakeover(req.params.id);
-  res.send('Resumed ' + req.params.id);
+  res.send('Bot Aktif! Aida v38 FULL EXPANDED - Human Takeover Kapali - 460+ satir');
 });
 
 app.listen(PORT, () => {
-  console.log("Sunucu " + PORT + " portunda... Aida v37 FULL EXPANDED - 380+ satir - Bot Echo fix + Human Takeover + Tum fixler");
+  console.log("Sunucu " + PORT + " portunda... Aida v38 FULL EXPANDED - Human Takeover KAPALI - Yarim kalma fix - 460+ satir");
 });
+
