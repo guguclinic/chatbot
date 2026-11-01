@@ -108,6 +108,16 @@ MUSAITLIK (sadece randevu/musaitlik sorulunca):
 RANDEVU ONAYI:
 Musteri gun/saat belirtirse: "Belirttiginiz saatte randevunuzu olusturabiliriz. Isminizi ve telefon numaranizi alabilir miyim? 😊"
 
+BOTOX ILE KAS KALDIRMA:
+- Musteri "botox ile kas kaldirma" gibi bir sey sorarsa: "Botox yaparken kaslarin ucundan kaldirma dozu da veriyoruz. 😊"
+
+KAS KALDIRMA / GOZ CEKME (BADEM GOZ):
+- Musteri botoxtan bagimsiz olarak daha fazla cekiklik, goz cekme, goz cekikligi veya kas kaldirma isterse Badem Goz uyguladigimizi soyle: "Badem Goz uyguluyoruz, nakit odemede 18000 TL, KK ile odemede normal fiyat 25000 TL. 😊"
+
+SOMON DNA / PARIS ISILTISI NEDIR:
+- Musteri "Somon DNA nedir", "Paris Isiltisi nedir" diye sorarsa: "Peptit ve amino asit iceren mezoterapi uygulamalaridir. Parilti ve canlilik katar, botoksla harika bir kombindir. ✨"
+- Fiyatini sadece sorarsa soyle.
+
 KALICILIK:
 - Dudak dolgusu, nazolabial, goz alti isik dolgusu: 10-12 ay
 - Botox: 5-6 ay, duzenli yaptiranlarda uzar
@@ -119,9 +129,10 @@ FIYATLAR (guncel, sadece sorulan hizmeti soyle, "nakit" kelimesini mutlaka kulla
 - Sakak 4500 TL nakit, Burun 5200 TL nakit, Cene 3800 TL nakit
 - Goz alti isik dolgusu 5200 TL kampanya (normal 7000 TL)
 - Paris + Somon DNA + Genclik Asisi 3500 TL nakit
-- Alin/Kas Arasi/Kaz Ayaklari Botox (toplam 5 bolge): Allergan 3800 TL nakit, Dysport 4400 TL nakit. Alin, kas arasi ve kaz ayaklarinin yanina ihtiyaca gore burun kenarindaki kirisikliklara ve dudak ustu cizgilere kucuk atislar yapabiliyoruz, toplamda 5 bolge. Hediye Somon DNA + Paris Isiltisi
+- Alin/Kas Arasi/Kaz Ayaklari Botox (toplam 5 bolge): Allergan 3800 TL nakit, Dysport 4400 TL nakit. Alin, kas arasi ve kaz ayaklarinin yanina ihtiyaca gore burun kenarindaki kirisikliklara ve dudak ustu cizgilere kucuk atislar yapabiliyoruz, toplamda 5 bolge. Botox yaparken kaslarin ucundan kaldirma dozu da veriyoruz. Hediye Somon DNA + Paris Isiltisi
 - Sivi Yuz Germe: 6 ML PLLA Eldermafill + 5 Bolge Botox + Paris Isiltisi + Somon DNA 21000 TL nakit
-- Radiesse 19000 TL nakit, Novuma 14000 TL nakit, Badem Goz 18000 TL nakit
+- Radiesse 19000 TL nakit, Novuma 14000 TL nakit
+- Badem Goz (kas kaldirma / goz cekme): Nakit odemede 18000 TL, KK ile odemede normal fiyat 25000 TL
 - Ip Aski: 6 adet 16000 TL nakit (KK 22000 TL), 8 adet 18000 TL nakit (KK 25000 TL)
 - Kampanya: x6 Ip Aski + 2 ML Sivi Yuz Germe 16000 TL nakit, x8 Ip Aski + 2 ML Sivi Yuz Germe 18000 TL nakit
 - Fiyatlar Alsancak ve Alacati/Cesme subelerinde ayni.
@@ -134,6 +145,8 @@ SINIRLAR:
 `;
 
 const MUSAITLIK_TAM = "Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar? 😊";
+
+const BADEM_GOZ_CEVAP = "Badem Goz uyguluyoruz, nakit odemede 18000 TL, KK ile odemede normal fiyat 25000 TL. 😊";
 
 async function getGroqReply(userMessage, senderId, isGreeted) {
   const lower = userMessage.toLowerCase();
@@ -152,6 +165,13 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   if (lower.trim().length < 25 && kisaTesekkur.includes(lower.trim())) {
     return "Tesekkurler, sizi klinigimizde gormekten memnuniyet duyariz. ✨";
   }
+
+  // Kas kaldirma / goz cekme tespiti
+  const kasKaldirma = /ka[sş][ıi]?\s*(kald[ıi]r|kald[ıi]rma|yukar)/.test(lower);
+  const gozCekme = /g[oö]z\s*(çekme|cekme|çekik|cekik|kald[ıi]r)/.test(lower) ||
+    lower.includes("çekiklik") || lower.includes("cekiklik") ||
+    lower.includes("çekik") || lower.includes("cekik");
+  const botoxVar = lower.includes("botox") || lower.includes("botoks");
 
   if (lower.includes("kalici") || lower.includes("kalıc") || lower.includes("kac ay")) {
     if (ctx && ctx.lastTopic === 'dudak') {
@@ -201,6 +221,21 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     lower.includes("calisiyor")
   ) {
     return "Evet, su an musaitligimiz " + MUSAITLIK_TAM;
+  }
+
+  // Botox ile kas kaldirma -> kaldirma dozu cevabi
+  if (botoxVar && kasKaldirma) {
+    updateContext(senderId, "botox");
+    return "Botox yaparken kaslarin ucundan kaldirma dozu da veriyoruz. 😊";
+  }
+
+  // Daha fazla cekiklik / goz cekme / botoxsuz kas kaldirma -> Badem Goz
+  if (
+    lower.includes("badem goz") || lower.includes("badem göz") ||
+    gozCekme || kasKaldirma
+  ) {
+    updateContext(senderId, "bademgoz");
+    return BADEM_GOZ_CEVAP;
   }
 
   if (lower.includes("dudak")) {
@@ -254,6 +289,16 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     return "Burun dolgusu 5200 TL nakit. 😊";
   }
 
+  // Somon DNA / Paris Isiltisi nedir
+  if (
+    (lower.includes("paris") || lower.includes("somon")) &&
+    (lower.includes("nedir") || lower.includes("ne ise yar") ||
+     lower.includes("ne işe yar") || lower.includes("ne demek") ||
+     lower.includes("nasil bir"))
+  ) {
+    return "Peptit ve amino asit iceren mezoterapi uygulamalaridir. Parilti ve canlilik katar, botoksla harika bir kombindir. ✨";
+  }
+
   if (lower.includes("paris") || lower.includes("somon") || lower.includes("genclik")) {
     return "Paris Isiltisi, Somon DNA ve Genclik Asisi hepsi bir arada 3500 TL nakit kampanya. ✨";
   }
@@ -276,7 +321,6 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
 
   if (lower.includes("radiesse")) return "Radiesse 19000 TL nakit. ✨";
   if (lower.includes("novuma")) return "Novuma 14000 TL nakit. 😊";
-  if (lower.includes("badem goz") || lower.includes("badem göz")) return "Badem Goz 18000 TL nakit. ✨";
 
   if (lower.includes("ip aski") || lower.includes("ip askı")) {
     if (lower.includes("6") && (lower.includes("2 ml") || lower.includes("sivi") || lower.includes("sıvı"))) {
@@ -301,7 +345,7 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     lower.includes("alin") || lower.includes("kaz ayagi") ||
     lower.includes("kas arasi")
   ) {
-    return "Alin, kas arasi ve kaz ayaklarinin yanina ihtiyaca gore burun kenari ve dudak ustu cizgilere kucuk atislar yapiyoruz, toplam 5 bolge. Allergan 3800 TL nakit, Dysport 4400 TL nakit, hediye Somon DNA + Paris Isiltisi. ✨";
+    return "Alin, kas arasi ve kaz ayaklarinin yanina ihtiyaca gore burun kenari ve dudak ustu cizgilere kucuk atislar yapiyoruz, toplam 5 bolge. Kaslarin ucundan kaldirma dozu da veriyoruz. Allergan 3800 TL nakit, Dysport 4400 TL nakit, hediye Somon DNA + Paris Isiltisi. ✨";
   }
 
   if (
@@ -422,9 +466,9 @@ app.post('/webhook', async function (req, res) {
 });
 
 app.get('/', function (req, res) {
-  res.send('Bot Aktif! Aida v41 - Guncel Prompt - Emoji - Guncel Fiyatlar');
+  res.send('Bot Aktif! Aida v42 - Guncel Prompt - Emoji - Guncel Fiyatlar');
 });
 
 app.listen(PORT, function () {
-  console.log("Sunucu " + PORT + " portunda... Aida v41 - Guncel Prompt - Emoji - Guncel Fiyatlar");
+  console.log("Sunucu " + PORT + " portunda... Aida v42 - Guncel Prompt - Emoji - Guncel Fiyatlar");
 });
