@@ -15,15 +15,35 @@ const greetedUsers = new Map();
 const userContext = new Map();
 const chatHistory = new Map();
 const muayeneSoruldu = new Map();
+const randevuTalebi = new Map();
+const pending = new Map();
+const processing = new Set();
+
+const BIRLESTIRME_MS = 4000;
 
 function sleep(ms) {
   return new Promise(function (r) { setTimeout(r, ms); });
 }
 
+function trTarih(offsetGun) {
+  const d = new Date(Date.now() + (offsetGun || 0) * 86400000);
+  return d.toLocaleDateString('tr-TR', {
+    timeZone: 'Europe/Istanbul',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  });
+}
+
+function telefonVarMi(text) {
+  const digits = text.replace(/\D/g, "");
+  return /5\d{9}/.test(digits);
+}
+
 function addHistory(senderId, role, content) {
   const h = chatHistory.get(senderId) || [];
   h.push({ role: role, content: content });
-  while (h.length > 6) h.shift();
+  while (h.length > 8) h.shift();
   chatHistory.set(senderId, h);
 }
 
@@ -109,13 +129,30 @@ URSLUP:
 - Cumle sonlarina ara sira emoji koyabilirsin 😊 ✨ (her cumlede degil).
 
 SATIS VE RANDEVU KURALI (COK ONEMLI):
-- HER cevabin sonuna konusulan konuyla ilgili TEK bir kisa soru ekle ve musteriyi nazikce randevuya yonlendir.
+- HER cevabin sonuna konusulan konuyla ilgili TEK bir kisa soru ekle ve musteriyi nazikce randevuya yonlendir. (Randevu talebi alindiktan sonra bu kural gecerli degil, asagiya bak.)
 - Soru konuyla alakali olsun. Ornek: dudak konusuluyorsa "Dogal bir gorunum mu yoksa daha belirgin bir dolgunluk mu dusunuyorsunuz?", botox konusuluyorsa "Daha cok hangi bolgedeki cizgiler sizi rahatsiz ediyor?", fiyat soruldugunda "Size uygun bir gun ayarlayalim mi?"
 - Musteriyi ikna et: uygulamayi Dr Ozgen Yildirim'in yaptigini, sonuclarin dogal oldugunu, kampanyalarin ve hediye uygulamalarin oldugunu gerektiginde dogal sekilde hatirlat. Baskici olma, sicak ve guven veren bir dil kullan.
 - Ayni soruyu veya ayni cumleyi arka arkaya tekrarlama. Konusma gecmisine bak.
-- Musteri "evet", "olur", "isterim" gibi cevap verirse musaitlik cumlesini ver. Musteri gun/saat soylerse isim ve telefon iste.
 - Soru cevabin EN SONUNDA olsun, tek soru isareti kullan.
 - "Ucretsiz muayene" teklifini KENDIN YAPMA. Bu teklifi sistem konusma basina bir kere otomatik ekliyor. Musteri ucretsiz muayeneyi kendisi sorarsa evet ucretsiz muayene yapiyoruz de.
+
+RANDEVU AKISI (COK ONEMLI):
+- Sen randevuyu sisteme KAYDEDEMEZSIN. "Randevunuz kaydedildi / olusturuldu / ayarlandi" ASLA deme.
+- Gun, saat, sube, isim ve telefon alininca su cumleyi kur: "Talebinizi aldim, ekibimiz sizi arayarak randevunuzu kesinlestirecek. 😊"
+- Eksik bilgiyi sirayla iste: once gun ve sube, sonra saat, sonra isim ve telefon (ikisini tek mesajda iste). Her mesajda sadece eksik olani sor.
+- Musteri isim ve telefonu verdiyse bir daha ISTEME, teyit de isteme.
+- Sadece musaitlik listesindeki gun ve saatlerde randevu oner. Aralik disinda saat isterse nazikce en yakin uygun saati oner. Araligin bitis saatine randevu verme (ornegin Pazartesi 16:30-19:00 araligi icin en gec 18:30 oner).
+- "Yarin, bugun, haftaya" gibi ifadelerde sistem bilgisindeki tarihe bak. O gun musaitlik yoksa bunu soyle ve en yakin uygun gunu oner.
+- Randevu talebi alindiktan sonra (RandevuTalebiAlindi:EVET) tekrar randevu sorusu SORMA, kapanis sorusu ekleme. Sadece yardimci ol (konum, hazirlik, tesekkur) ve "sizi bekliyoruz" de.
+
+ON GORUSME / MUAYENE:
+- Musteri "on gorusme", "muayene", "gorusmek istiyorum" derse ucretsiz on gorusme yaptigimizi soyle ve hemen gun/sube sor.
+
+OTOPARK:
+- Klinigimizin otoparki vardir. Otoparkin ucretli/ucretsiz olmasi, kapasitesi, tam yeri gibi detaylari BILMIYORSUN, uydurma. Detay sorulursa: "Otopark imkanimiz mevcut, detayi randevu teyidinde ekibimiz iletecektir. 😊"
+
+BILGI UYDURMA YASAK:
+- Listede olmayan hicbir bilgiyi (yol tarifi, odeme taksit, uygulama suresi, seans sayisi vb.) uydurma. Emin degilsen: "Bu konuda net bilgiyi randevu teyidinde ekibimiz size iletecektir. 😊" de.
 
 TANISMA:
 - Sadece ilk selamlamada bir kere: "Merhaba, ben GuGu Clinic'ten Aida." de.
@@ -130,9 +167,6 @@ ADRES (sadece sorulursa):
 
 MUSAITLIK (sadece randevu/musaitlik sorulunca):
 "Su an musaitligimiz Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar?"
-
-RANDEVU ONAYI:
-Musteri gun/saat belirtirse: "Belirttiginiz saatte randevunuzu olusturabiliriz. Isminizi ve telefon numaranizi alabilir miyim? 😊"
 
 BOTOX ILE KAS KALDIRMA:
 - Musteri "botox ile kas kaldirma" gibi bir sey sorarsa: "Botox yaparken kaslarin ucundan kaldirma dozu da veriyoruz. 😊"
@@ -181,7 +215,6 @@ const BADEM_GOZ_CEVAP = "Badem Goz uyguluyoruz, nakit odemede 18000 TL, KK ile o
 // Konusma basina sadece BIR kere eklenir
 const MUAYENE_CUMLESI = "Muayene sonrasi size de uygunsa uygulamayi yapabiliriz, ucretsiz muayene randevusu ister misiniz? 😊";
 
-// Konuya gore kapanis sorulari
 const KAPANIS_SORULARI = {
   dudak: [
     "Dogal bir gorunum mu yoksa daha belirgin bir dolgunluk mu dusunuyorsunuz? Size uygun bir gun ayarlayalim mi? 😊",
@@ -224,6 +257,9 @@ const KAPANIS_SORULARI = {
   adres: [
     "Hangi gun gelmeyi dusunuyorsunuz? Size uygun bir randevu olusturalim. 😊"
   ],
+  otopark: [
+    "Hangi gun gelmeyi dusunuyorsunuz? Size uygun bir randevu olusturalim. 😊"
+  ],
   cesme: [
     "Hangi uygulamayi dusunuyorsunuz? Size uygun bir gun ayarlayalim. 😊"
   ],
@@ -258,10 +294,9 @@ function soruVarMi(text) {
   return /\?[\s\p{Extended_Pictographic}\uFE0F]*$/u.test(text.trim());
 }
 
-// Ucretsiz muayene teklifi: konusmada bir hizmet konusuluyorsa ve daha once sorulmadiysa
 function muayeneUygunMu(senderId, topic, reply) {
   if (muayeneSoruldu.has(senderId)) return false;
-  if (!topic || topic === "genel" || topic === "adres" || topic === "cesme") return false;
+  if (!topic || topic === "genel" || topic === "adres" || topic === "cesme" || topic === "otopark") return false;
   if (reply.startsWith("Tesekkurler")) return false;
   if (reply.toLowerCase().includes("muayene")) return false;
   return true;
@@ -271,6 +306,9 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   const lower = userMessage.toLowerCase();
   const reply = await getReplyInner(userMessage, senderId, isGreeted);
 
+  // Randevu talebi alindiysa kapanis sorusu / muayene teklifi ekleme
+  if (randevuTalebi.has(senderId)) return reply;
+
   // Cevap zaten soruyla bitiyorsa veya telefon yonlendirmesiyse dokunma
   if (soruVarMi(reply) || reply.includes("0534 248")) {
     return reply;
@@ -279,7 +317,6 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   const ctx = getContext(senderId);
   const topic = konuTespit(lower) || (ctx ? ctx.lastTopic : null) || "genel";
 
-  // Ucretsiz muayene teklifi konusma basina bir kere, normal kapanis sorusunun yerine gecer
   if (muayeneUygunMu(senderId, topic, reply)) {
     muayeneSoruldu.set(senderId, Date.now());
     return reply + " " + MUAYENE_CUMLESI;
@@ -291,6 +328,7 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
 async function getReplyInner(userMessage, senderId, isGreeted) {
   const lower = userMessage.toLowerCase();
   const ctx = getContext(senderId);
+  const talepVar = randevuTalebi.has(senderId);
 
   if (isOnlyEmoji(userMessage)) {
     return "Tesekkurler, her zaman yazabilirsiniz. 😊";
@@ -331,6 +369,11 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
     return "Botoks 5-6 aydir, duzenli yaptirdiginizda sure uzuyor. ✨";
   }
 
+  if (lower.includes("otopark")) {
+    updateContext(senderId, "otopark");
+    return "Evet, otopark imkanimiz mevcut. Detayi randevu teyidinde ekibimiz iletecektir. 😊";
+  }
+
   if (lower.includes("adres") || lower.includes("konum") || lower.includes("nerede")) {
     updateContext(senderId, "adres");
     return "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb 📍";
@@ -344,20 +387,24 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
   ) {
     updateContext(senderId, "cesme");
     if (
-      lower.includes("randevu") || lower.includes("ne zaman") ||
-      lower.includes("geliyosunuz") || lower.includes("geliyorsunuz") ||
-      lower.includes("musait") || lower.includes("saat") ||
-      lower.includes("gun") || lower.includes("gün")
+      !talepVar && (
+        lower.includes("randevu") || lower.includes("ne zaman") ||
+        lower.includes("geliyosunuz") || lower.includes("geliyorsunuz") ||
+        lower.includes("musait") || lower.includes("saat") ||
+        lower.includes("gun") || lower.includes("gün")
+      )
     ) {
       return "Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda musaitligimiz var. Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 arasinda var. Hangisi size uyar? 😊";
     }
   }
 
   if (
-    lower.includes("acik mi") || lower.includes("acikmi") ||
-    lower.includes("geliyorum") || lower.includes("musait misiniz") ||
-    lower.includes("bugun acik") || lower.includes("ne zaman acik") ||
-    lower.includes("calisiyor")
+    !talepVar && (
+      lower.includes("acik mi") || lower.includes("acikmi") ||
+      lower.includes("geliyorum") || lower.includes("musait misiniz") ||
+      lower.includes("bugun acik") || lower.includes("ne zaman acik") ||
+      lower.includes("calisiyor")
+    )
   ) {
     return "Evet, su an musaitligimiz " + MUSAITLIK_TAM;
   }
@@ -493,22 +540,14 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
     return "Sivi Yuz Germe: 6 ML PLLA Eldermafill marka Sivi Yuzgerme + 5 Bolge Botox + Paris Isiltisi + Somon DNA 21000 TL nakit. ✨";
   }
 
-  if (
-    lower.includes("randevu alabilir") || lower.includes("randevu al") ||
-    lower.includes("randevu nasil") ||
-    (lower.includes("randevu") && lower.length < 80)
-  ) {
-    return "Tabii, su an musaitligimiz " + MUSAITLIK_TAM;
-  }
-
-  if (lower.match(/\d{2}:\d{2}/)) {
+  // Randevu talebi alinmadiysa sabit randevu cevaplari calisir, alindiysa AI devralir
+  if (!talepVar) {
     if (
-      lower.includes("carsamba") || lower.includes("cumartesi") ||
-      lower.includes("pazar") || lower.includes("pazartesi") ||
-      lower.includes("persembe") || lower.includes("cesme") ||
-      lower.includes("alacati") || lower.includes("alaçatı")
+      lower.includes("randevu alabilir") || lower.includes("randevu al") ||
+      lower.includes("randevu nasil") ||
+      (lower.includes("randevu") && lower.length < 80)
     ) {
-      return "Belirttiginiz saatte randevunuzu olusturabiliriz. Isminizi ve telefon numaranizi alabilir miyim? 😊";
+      return "Tabii, su an musaitligimiz " + MUSAITLIK_TAM;
     }
   }
 
@@ -520,7 +559,9 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
           SYSTEM_PROMPT +
           "\nGreeted:" + (isGreeted ? "EVET - merhaba deme" : "HAYIR") +
           " LastTopic:" + (ctx ? ctx.lastTopic : "yok") +
-          " UcretsizMuayeneTeklifEdildi:" + (muayeneSoruldu.has(senderId) ? "EVET - tekrar etme" : "HAYIR");
+          " UcretsizMuayeneTeklifEdildi:" + (muayeneSoruldu.has(senderId) ? "EVET - tekrar etme" : "HAYIR") +
+          " RandevuTalebiAlindi:" + (talepVar ? "EVET - tekrar randevu sorma, kapanis sorusu ekleme" : "HAYIR") +
+          " Bugun: " + trTarih(0) + ". Yarin: " + trTarih(1) + ".";
 
         const messages = [{ role: "system", content: systemContent }]
           .concat(getHistory(senderId))
@@ -567,7 +608,52 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
   }
 }
 
-async function handleMessage(m) {
+// Pes pese gelen mesajlari birlestirip tek cevap verir
+async function processBatch(senderId) {
+  const p = pending.get(senderId);
+  if (!p) return;
+
+  if (processing.has(senderId)) {
+    p.timer = setTimeout(function () { processBatch(senderId); }, 2000);
+    return;
+  }
+
+  pending.delete(senderId);
+  processing.add(senderId);
+
+  try {
+    const text = p.texts.join(" ");
+    const baslangic = p.first;
+
+    const ctxNow = getContext(senderId);
+    console.log("Gelen Mesaj: " + text + " | Context: " + (ctxNow ? ctxNow.lastTopic : "yok"));
+
+    // Telefon numarasi geldiyse randevu talebi olarak isaretle
+    if (telefonVarMi(text)) {
+      randevuTalebi.set(senderId, Date.now());
+      console.log("YENI RANDEVU TALEBI: " + senderId + " | " + text);
+    }
+
+    const isGreeted = greetedUsers.has(senderId);
+    const reply = await getGroqReply(text, senderId, isGreeted);
+    if (!isGreeted) greetedUsers.set(senderId, Date.now());
+    addHistory(senderId, "user", text);
+    addHistory(senderId, "assistant", reply);
+
+    // Ilk mesajdan itibaren toplam 6-12 sn
+    const hedefMs = 6000 + Math.random() * 6000;
+    const kalan = Math.max(0, hedefMs - (Date.now() - baslangic));
+    await sleep(kalan);
+
+    await sendSplitMessages(senderId, reply);
+  } catch (e) {
+    console.log("Mesaj isleme hatasi: " + e.message);
+  } finally {
+    processing.delete(senderId);
+  }
+}
+
+function handleMessage(m) {
   try {
     if (!m || !m.message) return;
     if (m.message.is_echo) {
@@ -584,25 +670,16 @@ async function handleMessage(m) {
       return;
     }
 
-    const ctxNow = getContext(senderId);
-    console.log("Gelen Mesaj: " + text + " | Context: " + (ctxNow ? ctxNow.lastTopic : "yok"));
-
-    const isGreeted = greetedUsers.has(senderId);
-    const baslangic = Date.now();
-
-    const reply = await getGroqReply(text, senderId, isGreeted);
-    if (!isGreeted) greetedUsers.set(senderId, Date.now());
-    addHistory(senderId, "user", text);
-    addHistory(senderId, "assistant", reply);
-
-    // Toplam bekleme 6-12 sn, cevap hazirlama suresi bundan dusulur
-    const hedefMs = 6000 + Math.random() * 6000;
-    const kalan = Math.max(0, hedefMs - (Date.now() - baslangic));
-    await sleep(kalan);
-
-    await sendSplitMessages(senderId, reply);
+    let p = pending.get(senderId);
+    if (!p) {
+      p = { texts: [], first: Date.now(), timer: null };
+      pending.set(senderId, p);
+    }
+    p.texts.push(text);
+    if (p.timer) clearTimeout(p.timer);
+    p.timer = setTimeout(function () { processBatch(senderId); }, BIRLESTIRME_MS);
   } catch (e) {
-    console.log("Mesaj isleme hatasi: " + e.message);
+    console.log("Mesaj alma hatasi: " + e.message);
   }
 }
 
@@ -623,7 +700,6 @@ app.post('/webhook', function (req, res) {
     for (const entry of (body.entry || [])) {
       const list = entry.messaging || [];
       for (const m of list) {
-        // await yok: her mesaj ayri calisir, birbirini beklemez
         handleMessage(m);
       }
     }
@@ -633,9 +709,9 @@ app.post('/webhook', function (req, res) {
 });
 
 app.get('/', function (req, res) {
-  res.send('Bot Aktif! Aida v46');
+  res.send('Bot Aktif! Aida v47');
 });
 
 app.listen(PORT, function () {
-  console.log("Sunucu " + PORT + " portunda... Aida v46");
+  console.log("Sunucu " + PORT + " portunda... Aida v47");
 });
