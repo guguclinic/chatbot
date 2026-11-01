@@ -14,6 +14,7 @@ const recentMessages = new Map();
 const greetedUsers = new Map();
 const userContext = new Map();
 const chatHistory = new Map();
+const muayeneSoruldu = new Map();
 
 function sleep(ms) {
   return new Promise(function (r) { setTimeout(r, ms); });
@@ -106,7 +107,15 @@ URSLUP:
 - Gun/saat listesini sadece randevu sorulunca ver, fiyat mesajlarina ekleme.
 - "Canim" deme, hep "siz" de.
 - Cumle sonlarina ara sira emoji koyabilirsin 😊 ✨ (her cumlede degil).
-- Sadece soruyu cevapla, sorulmayan bilgi ekleme.
+
+SATIS VE RANDEVU KURALI (COK ONEMLI):
+- HER cevabin sonuna konusulan konuyla ilgili TEK bir kisa soru ekle ve musteriyi nazikce randevuya yonlendir.
+- Soru konuyla alakali olsun. Ornek: dudak konusuluyorsa "Dogal bir gorunum mu yoksa daha belirgin bir dolgunluk mu dusunuyorsunuz?", botox konusuluyorsa "Daha cok hangi bolgedeki cizgiler sizi rahatsiz ediyor?", fiyat soruldugunda "Size uygun bir gun ayarlayalim mi?"
+- Musteriyi ikna et: uygulamayi Dr Ozgen Yildirim'in yaptigini, sonuclarin dogal oldugunu, kampanyalarin ve hediye uygulamalarin oldugunu gerektiginde dogal sekilde hatirlat. Baskici olma, sicak ve guven veren bir dil kullan.
+- Ayni soruyu veya ayni cumleyi arka arkaya tekrarlama. Konusma gecmisine bak.
+- Musteri "evet", "olur", "isterim" gibi cevap verirse musaitlik cumlesini ver. Musteri gun/saat soylerse isim ve telefon iste.
+- Soru cevabin EN SONUNDA olsun, tek soru isareti kullan.
+- "Ucretsiz muayene" teklifini KENDIN YAPMA. Bu teklifi sistem konusma basina bir kere otomatik ekliyor. Musteri ucretsiz muayeneyi kendisi sorarsa evet ucretsiz muayene yapiyoruz de.
 
 TANISMA:
 - Sadece ilk selamlamada bir kere: "Merhaba, ben GuGu Clinic'ten Aida." de.
@@ -169,7 +178,117 @@ const MUSAITLIK_TAM = "Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:
 
 const BADEM_GOZ_CEVAP = "Badem Goz uyguluyoruz, nakit odemede 18000 TL, KK ile odemede normal fiyat 25000 TL. 😊";
 
+// Konusma basina sadece BIR kere eklenir
+const MUAYENE_CUMLESI = "Muayene sonrasi size de uygunsa uygulamayi yapabiliriz, ucretsiz muayene randevusu ister misiniz? 😊";
+
+// Konuya gore kapanis sorulari
+const KAPANIS_SORULARI = {
+  dudak: [
+    "Dogal bir gorunum mu yoksa daha belirgin bir dolgunluk mu dusunuyorsunuz? Size uygun bir gun ayarlayalim mi? 😊",
+    "Dudak formunuzda en cok neyi degistirmek istersiniz? Isterseniz bu hafta icin randevu olusturalim. ✨"
+  ],
+  botox: [
+    "Daha cok hangi bolgedeki cizgiler sizi rahatsiz ediyor? Isterseniz hemen bir randevu olusturalim. 😊",
+    "Botoksu ilk kez mi yaptiracaksiniz? Size uygun bir gun ayarlayalim mi? ✨"
+  ],
+  nazolabial: [
+    "Nazolabial cizgileriniz sizi en cok hangi anlarda rahatsiz ediyor? Size uygun bir gun ayarlayalim mi? 😊"
+  ],
+  gozalti: [
+    "Goz altinda daha cok morluk mu yoksa cokukluk mu var? Isterseniz bir degerlendirme icin randevu olusturalim. 😊"
+  ],
+  sakak: [
+    "Sakaklarinizdaki cokuklugu ne zamandir fark ediyorsunuz? Size uygun bir gun ayarlayalim mi? 😊"
+  ],
+  burun: [
+    "Burunda nasil bir degisiklik dusunuyorsunuz? Isterseniz Hocamizla yuz yuze gorusmek icin randevu olusturalim. 😊"
+  ],
+  ipaski: [
+    "Yuzunuzde en cok hangi bolgenin kalkmasini istiyorsunuz? Size uygun bir gun ayarlayalim mi? ✨"
+  ],
+  siviyuz: [
+    "Yuzunuzde daha cok hangi bolgede sarkma veya hacim kaybi goruyorsunuz? Isterseniz randevu olusturalim. 😊"
+  ],
+  bademgoz: [
+    "Gozunuzde ne kadar bir cekiklik dusunuyorsunuz? Isterseniz Hocamizla gorusmek icin randevu olusturalim. ✨"
+  ],
+  cene: [
+    "Cene hattinizda nasil bir sekil dusunuyorsunuz? Size uygun bir gun ayarlayalim mi? 😊"
+  ],
+  paris: [
+    "Botoksla birlikte yaptirmayi dusunur musunuz? Isterseniz birlikte planlayip randevu olusturalim. ✨"
+  ],
+  doktor: [
+    "Hocamizla yuz yuze gorusup size ozel bir plan olusturmak ister misiniz? Size uygun bir gun ayarlayalim. 😊"
+  ],
+  adres: [
+    "Hangi gun gelmeyi dusunuyorsunuz? Size uygun bir randevu olusturalim. 😊"
+  ],
+  cesme: [
+    "Hangi uygulamayi dusunuyorsunuz? Size uygun bir gun ayarlayalim. 😊"
+  ],
+  genel: [
+    "Hangi uygulamayla ilgileniyorsunuz? Isterseniz size uygun bir gun ayarlayalim. 😊",
+    "Size en uygun uygulamayi birlikte belirleyip randevu olusturalim mi? ✨"
+  ]
+};
+
+function konuTespit(lower) {
+  if (lower.includes("badem goz") || lower.includes("badem göz")) return "bademgoz";
+  if (lower.includes("dudak")) return "dudak";
+  if (lower.includes("botox") || lower.includes("botoks") || lower.includes("kaz ayagi") || lower.includes("kas arasi")) return "botox";
+  if (lower.includes("nazolab") || lower.includes("nazal")) return "nazolabial";
+  if (lower.includes("goz alti") || lower.includes("gozalti") || lower.includes("isik dolgu")) return "gozalti";
+  if (lower.includes("sakak")) return "sakak";
+  if (lower.includes("burun")) return "burun";
+  if (lower.includes("ip aski") || lower.includes("ip askı")) return "ipaski";
+  if (lower.includes("sivi yuz") || lower.includes("sıvı yüz")) return "siviyuz";
+  if (lower.includes("cene")) return "cene";
+  if (lower.includes("paris") || lower.includes("somon") || lower.includes("genclik")) return "paris";
+  if (lower.includes("doktor") || lower.includes("tecrubeli") || lower.includes("hocamiz") || lower.includes("uzman")) return "doktor";
+  return null;
+}
+
+function kapanisSorusu(topic) {
+  const liste = KAPANIS_SORULARI[topic] || KAPANIS_SORULARI.genel;
+  return liste[Math.floor(Math.random() * liste.length)];
+}
+
+function soruVarMi(text) {
+  return /\?[\s\p{Extended_Pictographic}\uFE0F]*$/u.test(text.trim());
+}
+
+// Ucretsiz muayene teklifi: konusmada bir hizmet konusuluyorsa ve daha once sorulmadiysa
+function muayeneUygunMu(senderId, topic, reply) {
+  if (muayeneSoruldu.has(senderId)) return false;
+  if (!topic || topic === "genel" || topic === "adres" || topic === "cesme") return false;
+  if (reply.startsWith("Tesekkurler")) return false;
+  if (reply.toLowerCase().includes("muayene")) return false;
+  return true;
+}
+
 async function getGroqReply(userMessage, senderId, isGreeted) {
+  const lower = userMessage.toLowerCase();
+  const reply = await getReplyInner(userMessage, senderId, isGreeted);
+
+  // Cevap zaten soruyla bitiyorsa veya telefon yonlendirmesiyse dokunma
+  if (soruVarMi(reply) || reply.includes("0534 248")) {
+    return reply;
+  }
+
+  const ctx = getContext(senderId);
+  const topic = konuTespit(lower) || (ctx ? ctx.lastTopic : null) || "genel";
+
+  // Ucretsiz muayene teklifi konusma basina bir kere, normal kapanis sorusunun yerine gecer
+  if (muayeneUygunMu(senderId, topic, reply)) {
+    muayeneSoruldu.set(senderId, Date.now());
+    return reply + " " + MUAYENE_CUMLESI;
+  }
+
+  return reply + " " + kapanisSorusu(topic);
+}
+
+async function getReplyInner(userMessage, senderId, isGreeted) {
   const lower = userMessage.toLowerCase();
   const ctx = getContext(senderId);
 
@@ -400,7 +519,8 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
         const systemContent =
           SYSTEM_PROMPT +
           "\nGreeted:" + (isGreeted ? "EVET - merhaba deme" : "HAYIR") +
-          " LastTopic:" + (ctx ? ctx.lastTopic : "yok");
+          " LastTopic:" + (ctx ? ctx.lastTopic : "yok") +
+          " UcretsizMuayeneTeklifEdildi:" + (muayeneSoruldu.has(senderId) ? "EVET - tekrar etme" : "HAYIR");
 
         const messages = [{ role: "system", content: systemContent }]
           .concat(getHistory(senderId))
@@ -475,8 +595,8 @@ async function handleMessage(m) {
     addHistory(senderId, "user", text);
     addHistory(senderId, "assistant", reply);
 
-    // Toplam bekleme 10-22 sn, cevap hazirlama suresi bundan dusulur
-    const hedefMs = 10000 + Math.random() * 12000;
+    // Toplam bekleme 6-12 sn, cevap hazirlama suresi bundan dusulur
+    const hedefMs = 6000 + Math.random() * 6000;
     const kalan = Math.max(0, hedefMs - (Date.now() - baslangic));
     await sleep(kalan);
 
@@ -513,9 +633,9 @@ app.post('/webhook', function (req, res) {
 });
 
 app.get('/', function (req, res) {
-  res.send('Bot Aktif! Aida v44');
+  res.send('Bot Aktif! Aida v46');
 });
 
 app.listen(PORT, function () {
-  console.log("Sunucu " + PORT + " portunda... Aida v44");
+  console.log("Sunucu " + PORT + " portunda... Aida v46");
 });
