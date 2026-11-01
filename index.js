@@ -30,42 +30,36 @@ function isOnlyEmoji(text) {
 
 const SYSTEM_PROMPT = `Senin adin Aida. GuGu Clinic satis danismani Aida'sin. Gercek bir insansin, Alsancak'ta klinikte calisiyorsun. Asla yapay zeka oldugunu soyleme. Kurumsal, siz'li, saygili, profesyonel konus.
 
-TANISMA KURALI - COK ONEMLI - TEKRAR YOK:
-- SADECE kullanici ile ILK KEZ konusuyorsan ve ilk mesaji "merhaba, selam, iyi gunler" ise O ZAMAN BIR KERE: "Merhaba, ben GuGu Clinic'ten Aida" de.
-- Daha once konusulan kisiye ASLA, ASLA, ASLA "Merhaba ben Aida" deme. Ayni konusmada ikinci kez fiyat sorarsa tekrar merhaba deme, direkt fiyati soyle.
+TANISMA KURALI - TEKRAR YOK:
+- SADECE ilk "merhaba, selam, iyi gunler" de BIR KERE: "Merhaba, ben GuGu Clinic'ten Aida" de.
+- Daha once konusulan kisiye ASLA tekrar "Merhaba ben Aida" deme.
 - Emoji gelince merhaba deme.
 
-KURUMSAL DIL:
-- ASLA "canim" kullanma. Hep "siz" de.
-- Samimi ama kurumsal: "Sizin icin en dogal sonucu planlariz", "Memnuniyetiniz bizim icin degerli"
+KURUMSAL: ASLA "canim" kullanma. Hep "siz" de.
 
 DOKTOR KURALI - DR OZGEN YILDIRIM - 36 SENE TECRUBE:
-- Musteri "doktor mu yapiyor, kim yapiyor, hocamiz kim, tecrubeli mi, uzman mi" diye SORARSA SADECE O ZAMAN doktor bilgisi ver.
-- Doktor bilgisi verirken ASLA "1988 Ege Universitesi mezunu" DEME, bu bilgi yasak, silindi. Soyle de: "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir, gelen danisanlarimizin hepsi cok memnun."
-- Fiyat soruldugunda doktor bilgisi ekleme, sadece fiyat soruldugunda fiyat soyle. Her mesaja doktor bilgisi ekleme.
+- Musteri "doktor mu yapiyor, kim yapiyor, hocamiz kim, tecrubeli mi, uzman mi" diye SORARSA: "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir, gelen danisanlarimizin hepsi cok memnun."
+- Fiyat soruldugunda doktor bilgisi ekleme.
 
 ADRES KURALI:
-- Adres SADECE "adres, konum, nerede" diye sorulursa soyle: "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb"
-- Fiyat soruldugunda adres ekleme, sadece istenirse soyle.
+- Adres SADECE sorulursa: "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb"
 
-FIYAT KURALI - SADECE SORULANLARI SOYLE:
-- Musteri "sakak dolgusu dudak dolgusu ve nazolabial dolgu ne kadar" derse SADECE o 3 fiyati soyle, baska sey ekleme.
-- Ornek dogru: "Sakak dolgusu 4500 TL nakit. Nazolabial dolgu 1 cc 3800 TL nakit, KK 5400 TL. Dudak dolgusu 1 cc Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL)."
-- Yanlis: Fiyat yanina adres, doktor, randevu ekleme. Sadece fiyat sorulduysa sadece fiyat.
+CALISMA SAATLERI KURALI - MUSAITLIK CUMLESI - COK ONEMLI:
+- ASLA "Pazartesi - Cuma 09:00 - 19:00" gibi genel saat uydurma, yasak.
+- Clinic acik mi, geliyorum, musait misiniz, ne zaman aciksiniz gibi sorularda HER ZAMAN: "Evet, su an musaitligimiz Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar?"
+- Randevu sorulursa da ayni musaitlik cumlesi ile soyle.
 
-NAZOLABIAL: 1 cc 3800 TL nakit, 5400 TL KK - Normal fiyat kampanyasiz
-YARIM CC: SADECE "yarim cc yapiyor musunuz" diye sorulunca soyle: "Evet yapiyoruz, yarim cc Elasty/Tuscan 2200 TL nakit, Juvederm 3000 TL nakit"
-DUDAK: Varsayilan SADECE 1cc: 3800 TL (KK 5400) ve 5400 TL (KK 7800)
-GOZ ALTI: 5200 TL kampanya, normal 7000 TL
-PARIS/SOMON/GENCLIK: Hepsi bir arada 3500 TL
-SAKAK: 4500 TL
+RANDEVU ONAYI - ISIM TELEFON:
+- Musteri saat belirtirse: "Carsamba 17:30 icin randevunuzu olusturabiliriz. Randevu onayi icin isminizi ve telefon numaranizi alabilir miyim?"
 
-CALISMA SAATLERI KURALI - COK ONEMLI - ASLA KISITLI GOSTERME:
-- ASLA "Pazartesi - Cuma 09:00 - 19:00", "Cumartesi 10:00 - 18:00" gibi genel calisma saati uydurma, yasak.
-- Clinic acik mi, geliyorum, musait misiniz, ne zaman aciksiniz gibi sorularda HER ZAMAN su 4 saati soyle: "Alsancak subemizde size Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri uygun, hangisi size uyar? Alacati/Cesme icin Persembe 17:00-18:30"
-- Asla kisitli gosterme, her zaman musaitlik var de, bu saatleri ilet.
-
-RANDEVU: Sadece randevu sorulursa soyle: Alacati Persembe 17:00-18:30, Alsancak Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00, Carsamba 16:30-19:00
+FIYAT KURALI:
+- Sadece sorulan fiyatlari soyle, baska sey ekleme.
+- Nazolabial: 1 cc 3800 TL nakit, 5400 TL KK - Normal fiyat kampanyasiz
+- Yarim CC: SADECE sorulunca
+- Dudak: Varsayilan SADECE 1cc: 3800 TL (KK 5400) ve 5400 TL (KK 7800)
+- Goz Alti: 5200 TL kampanya, normal 7000 TL
+- Paris/Somon/Genclik: Hepsi bir arada 3500 TL
+- Sakak: 4500 TL
 
 FIYAT LISTESI:
 - 5 Bolge Botox: Allergan 3800 TL, Dysport 4400 TL, Hediye Somon+Paris
@@ -82,8 +76,8 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   const lower = userMessage.toLowerCase();
   if (isOnlyEmoji(userMessage)) return "Tesekkurler, her zaman yazabilirsiniz. Sizi klinigimizde gormekten memnuniyet duyariz.";
   if (lower.includes("adres") || lower.includes("konum") || lower.includes("nerede")) return "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb. Sizi bekliyoruz.";
-  if (lower.includes("acik mi") || lower.includes("acikmi") || lower.includes("geliyorum") || lower.includes("musait misiniz") || lower.includes("calisiyor musunuz") || lower.includes("ne zaman acik") || lower.includes("bugun acik")) {
-    return "Evet, bekliyoruz. Alsancak subemizde size Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri uygun, hangisi size uyar? Alacati/Cesme icin Persembe 17:00-18:30 gelebilirsiniz.";
+  if (lower.includes("acik mi") || lower.includes("acikmi") || lower.includes("geliyorum") || lower.includes("musait misiniz") || lower.includes("bugun acik") || lower.includes("calisiyor musunuz")) {
+    return "Evet, su an musaitligimiz Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar?";
   }
   if ((lower.includes("nazolabial") || lower.includes("nazalobial") || lower.includes("nazobial")) && lower.includes("dolgu")) {
     return "Nazolabial dolgu 1 cc 3800 TL nakit odeme, kredi karti 5400 TL. Normal fiyatimizdir, kampanyasizdir.";
@@ -104,10 +98,16 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
     return "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir, gelen danisanlarimizin hepsi cok memnun.";
   }
   if (lower.includes("goz alti") || lower.includes("isik dolgusu")) return "Goz alti isik dolgusu su an kampanyamiz 5200 TL, normalde 7000 TL'den uyguluyoruz.";
-
-  // Coklu fiyat sorusu icin fast-path - sakak + dudak + nazolabial ayni anda
   if ((lower.includes("sakak") || lower.includes("saka")) && lower.includes("dudak") && (lower.includes("nazol") || lower.includes("nazal") || lower.includes("nazo"))) {
     return "Sakak dolgusu 4500 TL nakit. Nazolabial dolgu 1 cc 3800 TL nakit, kredi karti 5400 TL. Dudak dolgusu 1 cc Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL).";
+  }
+  if (lower.includes("randevu alabilir") || lower.includes("randevu al")) {
+    return "Tabii, su an musaitligimiz Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar?";
+  }
+  if (lower.includes("17:30") || lower.includes("17.30") || lower.match(/\d{2}:\d{2}/)) {
+    if (lower.includes("carsamba") || lower.includes("cumartesi") || lower.includes("pazar") || lower.includes("pazartesi")) {
+      return "Belirttiginiz saatte randevunuzu olusturabiliriz. Randevu onayi icin isminizi ve telefon numaranizi alabilir miyim?";
+    }
   }
 
   try {
@@ -117,7 +117,7 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
         const res = await axios.post("https://api.groq.com/openai/v1/chat/completions", {
           model: model,
           messages: [
-            { role: "system", content: SYSTEM_PROMPT + "\n\nGreetedBefore: " + (isGreeted ? "EVET daha once selamlasildi, ASLA Merhaba ben Aida deme, direkt fiyati soyle" : "HAYIR ilk mesaj") },
+            { role: "system", content: SYSTEM_PROMPT + "\nGreetedBefore: " + (isGreeted ? "EVET selamlasildi ASLA Merhaba ben Aida deme" : "HAYIR") },
             { role: "user", content: userMessage }
           ],
           temperature: 0.7,
@@ -126,15 +126,8 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
         let text = res.data.choices[0].message.content;
         if (text) {
           console.log("Groq calisti: " + model);
-          // 1988 ve Ege bilgisini zorla sil
           text = text.replace(/1988.*?(mezunu|Ege|Universitesi|Tip).*?/gi, "");
-          text = text.replace(/Ege.*?(Universitesi|Uni).*?mezunu/gi, "");
-          text = text.replace(/36 senedir.*?(doktor|medikal).*?/gi, "");
-          // Ayni konusmada ikinci kez merhaba deme
-          if (isGreeted) {
-            text = text.replace(/Merhaba, ben GuGu Clinic'ten Aida\.?\s*/gi, "");
-            text = text.replace(/Merhaba.*Aida.*\n?/gi, "");
-          }
+          if (isGreeted) text = text.replace(/Merhaba, ben GuGu Clinic'ten Aida\.?\s*/gi, "");
           return text.slice(0, 900).trim();
         }
       } catch (e) { continue; }
@@ -166,23 +159,12 @@ app.post('/webhook', async (req, res) => {
         const isGreeted = greetedUsers.has(m.sender.id);
         const reply = await getGroqReply(m.message.text, m.sender.id, isGreeted);
         if (!isGreeted) greetedUsers.set(m.sender.id, Date.now());
-        
-        // Tek fiyat sorusu ise bolme, direkt tek mesaj at
-        if (reply.length < 180) {
-          await axios.post("https://graph.facebook.com/v20.0/" + IG_ID + "/messages", { recipient: { id: m.sender.id }, message: { text: reply } }, { params: { access_token: PAGE_ACCESS_TOKEN } });
-          console.log("Gonderildi: " + reply.slice(0,80));
-        } else {
-          const parts = reply.split(/(?<=[.!?])\s+/).filter(s => s.trim()).slice(0,4);
-          for (let i=0;i<parts.length;i++) {
-            if (i>0) await new Promise(r=>setTimeout(r, 800));
-            await axios.post("https://graph.facebook.com/v20.0/" + IG_ID + "/messages", { recipient: { id: m.sender.id }, message: { text: parts[i] } }, { params: { access_token: PAGE_ACCESS_TOKEN } });
-            console.log("Gonderildi: " + parts[i].slice(0,80));
-          }
-        }
+        await axios.post("https://graph.facebook.com/v20.0/" + IG_ID + "/messages", { recipient: { id: m.sender.id }, message: { text: reply } }, { params: { access_token: PAGE_ACCESS_TOKEN } });
+        console.log("Gonderildi: " + reply.slice(0,80));
       }
     }
   } else res.sendStatus(404);
 });
 
-app.get('/', (req, res) => { res.send('Bot Aktif! Aida v26 - Dr Ozgen - Calisma saatleri fix'); });
-app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Aida v26 Final - Dr Ozgen - Calisma saatleri fix - 09:00-19:00 yasak"); });
+app.get('/', (req, res) => { res.send('Bot Aktif! Aida v28 - Musaitlik cumlesi - Dr Ozgen'); });
+app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Aida v28 Final - Musaitlik cumlesi - Dr Ozgen Yildirim 36 sene"); });
