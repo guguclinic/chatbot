@@ -30,35 +30,43 @@ function isOnlyEmoji(text) {
 
 const SYSTEM_PROMPT = `Senin adin Aida. GuGu Clinic satis danismani Aida'sin. Gercek bir insansin, Alsancak'ta klinikte calisiyorsun. Asla yapay zeka oldugunu soyleme. Kurumsal, siz'li, saygili, profesyonel konus.
 
-TANISMA: Ilk merhaba'da "Merhaba, ben GuGu Clinic'ten Aida" de, sonra ASLA tekrar merhaba deme. Emoji gelince merhaba deme.
+TANISMA KURALI - COK ONEMLI - TEKRAR YOK:
+- SADECE kullanici ile ILK KEZ konusuyorsan ve ilk mesaji "merhaba, selam, iyi gunler" ise O ZAMAN BIR KERE: "Merhaba, ben GuGu Clinic'ten Aida" de.
+- Daha once konusulan kisiye ASLA, ASLA, ASLA "Merhaba ben Aida" deme. Ayni konusmada ikinci kez fiyat sorarsa tekrar merhaba deme, direkt fiyati soyle.
+- Emoji gelince merhaba deme.
 
-KURUMSAL: ASLA "canim" kullanma. Hep "siz" de.
+KURUMSAL DIL:
+- ASLA "canim" kullanma. Hep "siz" de.
+- Samimi ama kurumsal: "Sizin icin en dogal sonucu planlariz", "Memnuniyetiniz bizim icin degerli"
 
-Alsancak Doktorlar Sitesi ve Dunya Goz Hastanesi yani.
+DOKTOR KURALI - DR OZGEN YILDIRIM - 36 SENE TECRUBE:
+- Musteri "doktor mu yapiyor, kim yapiyor, hocamiz kim, tecrubeli mi, uzman mi" diye SORARSA SADECE O ZAMAN doktor bilgisi ver.
+- Doktor bilgisi verirken ASLA "1988 Ege Universitesi mezunu" DEME, bu bilgi yasak, silindi. Soyle de: "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir, gelen danisanlarimizin hepsi cok memnun."
+- Fiyat soruldugunda doktor bilgisi ekleme, sadece fiyat soruldugunda fiyat soyle. Her mesaja doktor bilgisi ekleme.
 
-DOKTOR: "Tum uygulamalarimizi Hocamiz yapmaktadir, Hocamiz 1988 Ege Uni mezunu, 36 senedir uzman doktordur. Eli cok hafiftir, sonuclarimiz cok dogal."
+ADRES KURALI:
+- Adres SADECE "adres, konum, nerede" diye sorulursa soyle: "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb"
+- Fiyat soruldugunda adres ekleme, sadece istenirse soyle.
 
-ADRES: "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb"
+FIYAT KURALI - SADECE SORULANLARI SOYLE:
+- Musteri "sakak dolgusu dudak dolgusu ve nazolabial dolgu ne kadar" derse SADECE o 3 fiyati soyle, baska sey ekleme.
+- Ornek dogru: "Sakak dolgusu 4500 TL nakit. Nazolabial dolgu 1 cc 3800 TL nakit, KK 5400 TL. Dudak dolgusu 1 cc Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL)."
+- Yanlis: Fiyat yanina adres, doktor, randevu ekleme. Sadece fiyat sorulduysa sadece fiyat.
 
-NAZOLABIAL: "Nazolabial dolgu 1 cc 3800 TL nakit odeme, kredi karti 5400 TL. Normal fiyatimizdir, kampanyasiz. Hocamiz cok dogal doldurmaktadir."
+NAZOLABIAL: 1 cc 3800 TL nakit, 5400 TL KK - Normal fiyat kampanyasiz
+YARIM CC: SADECE "yarim cc yapiyor musunuz" diye sorulunca soyle: "Evet yapiyoruz, yarim cc Elasty/Tuscan 2200 TL nakit, Juvederm 3000 TL nakit"
+DUDAK: Varsayilan SADECE 1cc: 3800 TL (KK 5400) ve 5400 TL (KK 7800)
+GOZ ALTI: 5200 TL kampanya, normal 7000 TL
+PARIS/SOMON/GENCLIK: Hepsi bir arada 3500 TL
+SAKAK: 4500 TL
 
-YARIM CC: SADECE "yarim cc yapiyor musunuz" diye sorulunca: "Evet yapiyoruz, yarim cc Elasty/Tuscan 2200 TL nakit, Juvederm 3000 TL nakit". Normal dudak sorusunda yarim cc'den bahsetme.
-
-DUDAK: Varsayilan SADECE 1cc: "Dudak dolgusu 1 cc Russian Lips Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL)."
-
-GOZ ALTI: "Goz alti isik dolgusu kampanya 5200 TL nakit, normalde 7000 TL."
-
-PARIS/SOMON/GENCLIK: "Paris Isiltisi, Somon DNA ve Genclik Asisi hepsi bir arada 3500 TL kampanya."
-
-MUHABBET: 3-5 kisa mesajla anlat, her mesaj 1-2 cumle, insan gibi. KISITLAMA YOK.
-
-RANDEVU: Alacati Persembe 17:00-18:30, Alsancak Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00, Carsamba 16:30-19:00
+RANDEVU: Sadece randevu sorulursa soyle: Alacati Persembe 17:00-18:30, Alsancak Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00, Carsamba 16:30-19:00
 
 FIYAT LISTESI:
 - 5 Bolge Botox: Allergan 3800 TL, Dysport 4400 TL, Hediye Somon+Paris
 - Dudak 1cc: Elasty/Tuscan 3800 TL (KK 5400), Juvederm 5400 TL (KK 7800)
 - Dudak Yarim: SADECE SORULUNCA 2200 TL / 3000 TL
-- Nazolabial: 1 cc 3800 TL nakit, 5400 TL KK - Normal fiyat
+- Nazolabial: 1 cc 3800 TL nakit, 5400 TL KK
 - Goz Alti: 5200 TL kampanya
 - Paris+Somon+Genclik: 3500 TL
 - Sivi Yuz: Full Face 21000 TL, Cene 3800 TL, Burun 5200 TL, Sakak 4500 TL
@@ -69,15 +77,30 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   const lower = userMessage.toLowerCase();
   if (isOnlyEmoji(userMessage)) return "Tesekkurler, her zaman yazabilirsiniz. Sizi klinigimizde gormekten memnuniyet duyariz.";
   if (lower.includes("adres") || lower.includes("konum") || lower.includes("nerede")) return "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb. Sizi bekliyoruz.";
-  if ((lower.includes("nazolabial") || lower.includes("nazalobial") || lower.includes("nazobial")) && lower.includes("dolgu")) return "Nazolabial dolgu 1 cc 3800 TL nakit odeme, kredi karti 5400 TL. Normal fiyatimizdir, kampanyasizdir. Hocamiz bu bolgeyi cok dogal doldurmaktadir, yuzunuzde cok guzel bir toparlanma oluyor. Sizin icin de cok guzel bir sonuc planlayabiliriz.";
-  if (lower.includes("nazolabial") || lower.includes("nazalobial") || lower.includes("nazobial")) return "Nazolabial dolgu 1 cc 3800 TL nakit odeme, kredi karti 5400 TL. Normal fiyatimizdir, kampanyasizdir. Hocamiz bu bolgeyi cok dogal doldurmaktadir.";
-  if (lower.includes("yarim") && (lower.includes("cc") || lower.includes("dudak"))) return "Evet yapiyoruz. Yarim cc Elasty/Tuscan 2200 TL nakit, Juvederm 3000 TL nakit. Tam 1 cc isterseniz Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL).";
-  if (lower.includes("sakak") && (lower.includes("germe") || lower.includes("dolgu"))) {
-    if (!lower.includes("dudak") && !lower.includes("nazal") && !lower.includes("nazo")) return "Sakak dolgusu 4500 TL nakit. Hocamiz bu bolgeyi cok dogal doldurmaktadir.";
+  if ((lower.includes("nazolabial") || lower.includes("nazalobial") || lower.includes("nazobial")) && lower.includes("dolgu")) {
+    return "Nazolabial dolgu 1 cc 3800 TL nakit odeme, kredi karti 5400 TL. Normal fiyatimizdir, kampanyasizdir.";
+  }
+  if (lower.includes("nazolabial") || lower.includes("nazalobial") || lower.includes("nazobial")) {
+    return "Nazolabial dolgu 1 cc 3800 TL nakit odeme, kredi karti 5400 TL. Normal fiyatimizdir, kampanyasizdir.";
+  }
+  if (lower.includes("yarim") && (lower.includes("cc") || lower.includes("dudak"))) {
+    return "Evet yapiyoruz. Yarim cc Elasty/Tuscan 2200 TL nakit, Juvederm 3000 TL nakit. Tam 1 cc isterseniz Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL).";
+  }
+  if (lower.includes("sakak") && !lower.includes("dudak") && !lower.includes("nazal") && !lower.includes("nazo")) {
+    if (lower.includes("dolgu") || lower.includes("germe")) {
+      return "Sakak dolgusu 4500 TL nakit.";
+    }
   }
   if (lower.includes("paris") || lower.includes("somon") || lower.includes("genclik")) return "Paris Isiltisi, Somon DNA ve Genclik Asisi su an nakit odemede kampanyada hepsi bir arada 3500 TL.";
-  if (lower.includes("doktor mu") || lower.includes("kim yapiyor") || lower.includes("tecrubeli")) return "Tum uygulamalarimizi Hocamiz yapmaktadir, Hocamiz 1988 Ege Universitesi mezunu, 36 senedir medikal estetik ve doktorluk yapan uzman doktordur.";
+  if (lower.includes("doktor mu") || lower.includes("kim yapiyor") || lower.includes("tecrubeli") || lower.includes("hocamiz kim") || lower.includes("uzman mi")) {
+    return "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir, gelen danisanlarimizin hepsi cok memnun.";
+  }
   if (lower.includes("goz alti") || lower.includes("isik dolgusu")) return "Goz alti isik dolgusu su an kampanyamiz 5200 TL, normalde 7000 TL'den uyguluyoruz.";
+
+  // Coklu fiyat sorusu icin fast-path - sakak + dudak + nazolabial ayni anda
+  if ((lower.includes("sakak") || lower.includes("saka")) && lower.includes("dudak") && (lower.includes("nazol") || lower.includes("nazal") || lower.includes("nazo"))) {
+    return "Sakak dolgusu 4500 TL nakit. Nazolabial dolgu 1 cc 3800 TL nakit, kredi karti 5400 TL. Dudak dolgusu 1 cc Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL).";
+  }
 
   try {
     const models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
@@ -85,12 +108,27 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
       try {
         const res = await axios.post("https://api.groq.com/openai/v1/chat/completions", {
           model: model,
-          messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userMessage }],
-          temperature: 0.8,
-          max_tokens: 600
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT + "\n\nGreetedBefore: " + (isGreeted ? "EVET daha once selamlasildi, ASLA Merhaba ben Aida deme, direkt fiyati soyle" : "HAYIR ilk mesaj") },
+            { role: "user", content: userMessage }
+          ],
+          temperature: 0.7,
+          max_tokens: 400
         }, { headers: { 'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json' } });
-        const text = res.data.choices[0].message.content;
-        if (text) { console.log("Groq calisti: " + model); return text.slice(0, 900); }
+        let text = res.data.choices[0].message.content;
+        if (text) {
+          console.log("Groq calisti: " + model);
+          // 1988 ve Ege bilgisini zorla sil
+          text = text.replace(/1988.*?(mezunu|Ege|Universitesi|Tip).*?/gi, "");
+          text = text.replace(/Ege.*?(Universitesi|Uni).*?mezunu/gi, "");
+          text = text.replace(/36 senedir.*?(doktor|medikal).*?/gi, "");
+          // Ayni konusmada ikinci kez merhaba deme
+          if (isGreeted) {
+            text = text.replace(/Merhaba, ben GuGu Clinic'ten Aida\.?\s*/gi, "");
+            text = text.replace(/Merhaba.*Aida.*\n?/gi, "");
+          }
+          return text.slice(0, 900).trim();
+        }
       } catch (e) { continue; }
     }
     throw new Error("kapali");
@@ -120,16 +158,23 @@ app.post('/webhook', async (req, res) => {
         const isGreeted = greetedUsers.has(m.sender.id);
         const reply = await getGroqReply(m.message.text, m.sender.id, isGreeted);
         if (!isGreeted) greetedUsers.set(m.sender.id, Date.now());
-        const parts = reply.split(/(?<=[.!?])\s+/).slice(0,5);
-        for (let i=0;i<parts.length;i++) {
-          if (i>0) await new Promise(r=>setTimeout(r, 1000));
-          await axios.post("https://graph.facebook.com/v20.0/" + IG_ID + "/messages", { recipient: { id: m.sender.id }, message: { text: parts[i] } }, { params: { access_token: PAGE_ACCESS_TOKEN } });
-          console.log("Gonderildi: " + parts[i].slice(0,80));
+        
+        // Tek fiyat sorusu ise bolme, direkt tek mesaj at
+        if (reply.length < 180) {
+          await axios.post("https://graph.facebook.com/v20.0/" + IG_ID + "/messages", { recipient: { id: m.sender.id }, message: { text: reply } }, { params: { access_token: PAGE_ACCESS_TOKEN } });
+          console.log("Gonderildi: " + reply.slice(0,80));
+        } else {
+          const parts = reply.split(/(?<=[.!?])\s+/).filter(s => s.trim()).slice(0,4);
+          for (let i=0;i<parts.length;i++) {
+            if (i>0) await new Promise(r=>setTimeout(r, 800));
+            await axios.post("https://graph.facebook.com/v20.0/" + IG_ID + "/messages", { recipient: { id: m.sender.id }, message: { text: parts[i] } }, { params: { access_token: PAGE_ACCESS_TOKEN } });
+            console.log("Gonderildi: " + parts[i].slice(0,80));
+          }
         }
       }
     }
   } else res.sendStatus(404);
 });
 
-app.get('/', (req, res) => { res.send('Bot Aktif! Aida v23 Fixed'); });
-app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Aida v23 Final hazir - Kurumsal - Nazolabial eklendi"); });
+app.get('/', (req, res) => { res.send('Bot Aktif! Aida v25 - Dr Ozgen Yildirim - 36 sene tecrube'); });
+app.listen(PORT, () => { console.log("Sunucu " + PORT + " portunda... Aida v25 Final - Dr Ozgen Yildirim - 36 sene tecrube - Merhaba loop fix"); });
