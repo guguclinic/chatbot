@@ -80,15 +80,24 @@ function markBotMessage(recipientId, text) {
 }
 
 function isBotEcho(recipientId, text) {
-  const key = recipientId + ":" + text.trim().toLowerCase().slice(0, 80);
-  const ts = botSentMessages.get(key);
-  if (!ts) return false;
-  if (Date.now() - ts > 120000) {
-    botSentMessages.delete(key);
-    return false;
+  if (!text) return false;
+  const now = Date.now();
+  const lowerEcho = text.trim().toLowerCase();
+  // Tum bot mesajlarini tara, ayni recipient icin 2 dk icinde atilmis mi
+  for (let [key, ts] of botSentMessages.entries()) {
+    if (now - ts > 120000) {
+      botSentMessages.delete(key);
+      continue;
+    }
+    if (!key.startsWith(recipientId + ":")) continue;
+    const botText = key.split(":").slice(1).join(":").trim().toLowerCase();
+    // Fuzzy match: echo bot mesajinin icinde veya bot mesaji echo icinde veya ilk 30 karakter ayni
+    if (lowerEcho.includes(botText.slice(0,30)) || botText.includes(lowerEcho.slice(0,30)) || lowerEcho.slice(0,50) === botText.slice(0,50)) {
+      botSentMessages.delete(key);
+      return true;
+    }
   }
-  botSentMessages.delete(key);
-  return true;
+  return false;
 }
 
 function splitToMessages(text) {
@@ -171,7 +180,7 @@ FIYAT - SADECE SORULANI SOYLE:
 - Dudak 1cc: Elasty/Tuscan 3800 TL nakit KK 5400, Juvederm 5400 TL nakit KK 7800
 - Yarim cc sadece sorulunca: 2200 TL / 3000 TL
 - Sakak 4500 TL, Burun 5200 TL, Goz alti 5200 TL kampanya normal 7000 TL, Paris+Somon+Genclik 3500 TL
-- Botox 5 Bolge: Allergan 3800 TL Dysport 4400 TL Hediye Somon+Paris
+- Botox 5 Bolge: Allergan 3800 TL nakit Dysport 4400 TL nakit Hediye Somon DNA + Paris Isiltisi - HER ZAMAN nakit kelimesi yaz
 - Sivi Yuz: Full Face 21000 TL, Cene 3800 TL, Burun 5200 TL, Sakak 4500 TL
 - Radiesse 19000, Novuma 14000, Badem Goz 18000, Ip Aski 6 adet 16000 KK 22000 8 adet 18000 KK 25000
 
@@ -287,9 +296,9 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   }
 
   if (lower.includes("botox") || lower.includes("botoks")) {
-    if (lower.includes("fiyat") || lower.includes("ne kadar") || lower.includes("kac tl") || lower.includes("kaç tl") || lower.includes("marka")) {
-      return "5 Bolge Botox Allergan 3800 TL, Dysport 4400 TL nakit. Hediye Somon DNA + Paris Isiltisi.";
-    }
+    // Sadece "botox" yazsa bile fiyat ver, nakit kelimesi mutlaka olsun
+    updateContext(senderId, "botox");
+    return "5 Bolge Botox Allergan 3800 TL nakit, Dysport 4400 TL nakit. Hediye Somon DNA + Paris Isiltisi.";
   }
 
   if (lower.includes("randevu alabilir") || lower.includes("randevu al") || lower.includes("randevu nasil") || (lower.includes("randevu") && lower.length < 60)) {
@@ -413,7 +422,7 @@ app.post('/webhook', async (req, res) => {
 
 app.get('/', (req, res) => {
   const takeoverCount = humanTakeover.size;
-  res.send('Bot Aktif! Aida v36 FULL EXPANDED - 380+ satir | Takeover: ' + takeoverCount);
+  res.send('Bot Aktif! Aida v37 FULL EXPANDED - 380+ satir | Takeover: ' + takeoverCount);
 });
 
 app.get('/human', (req, res) => {
@@ -449,5 +458,5 @@ app.get('/resume/:id', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log("Sunucu " + PORT + " portunda... Aida v36 FULL EXPANDED - 380+ satir - Bot Echo fix + Human Takeover + Tum fixler");
+  console.log("Sunucu " + PORT + " portunda... Aida v37 FULL EXPANDED - 380+ satir - Bot Echo fix + Human Takeover + Tum fixler");
 });
