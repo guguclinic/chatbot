@@ -83,18 +83,6 @@ function splitToMessages(text) {
   return result.map(function (s) { return s.slice(0, 900); });
 }
 
-async function sendTyping(recipientId) {
-  try {
-    await axios.post(
-      "https://graph.facebook.com/v20.0/" + IG_ID + "/messages",
-      { recipient: { id: recipientId }, sender_action: "typing_on" },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
-    );
-  } catch (e) {
-    console.log("Typing hatasi: " + e.message);
-  }
-}
-
 async function sendSplitMessages(recipientId, text) {
   const msgs = splitToMessages(text);
   for (let i = 0; i < msgs.length; i++) {
@@ -124,8 +112,9 @@ TANISMA:
 - Sadece ilk selamlamada bir kere: "Merhaba, ben GuGu Clinic'ten Aida." de.
 - Konusma devam ediyorsa tekrar kendini tanitma. Mesaj sadece emoji ise merhaba deme.
 
-DOKTOR (sadece "doktor mu yapiyor, kim yapiyor, hocamiz kim, tecrubeli mi, uzman mi" diye sorulursa):
+DOKTOR (sadece "doktor mu yapiyor, doktor kim, kim yapiyor, hocamiz kim, tecrubeli mi, uzman mi" diye sorulursa):
 "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir." Fiyat sorulunca doktor bilgisi ekleme.
+Doktorun adi tam olarak "Dr Ozgen Yildirim" seklinde yazilir, harf degistirme.
 
 ADRES (sadece sorulursa):
 "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb 📍"
@@ -332,7 +321,9 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   }
 
   if (
-    lower.includes("doktor mu") || lower.includes("kim yapiyor") ||
+    lower.includes("doktor mu") || lower.includes("doktor kim") ||
+    lower.includes("doktorunuz") || lower.includes("hangi doktor") ||
+    lower.includes("kim yapiyor") || lower.includes("kim yapıyor") ||
     lower.includes("tecrubeli") || lower.includes("hocamiz kim") ||
     lower.includes("uzman mi")
   ) {
@@ -403,7 +394,7 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   }
 
   try {
-    const models = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "llama-3.1-8b-instant"];
+    const models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
     for (const model of models) {
       try {
         const systemContent =
@@ -419,12 +410,9 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
           model: model,
           messages: messages,
           temperature: 0.6,
-          max_tokens: 1200
+          max_tokens: 2000,
+          reasoning_effort: "low"
         };
-        if (model.startsWith("openai/gpt-oss")) {
-          reqBody.reasoning_effort = "low";
-          reqBody.max_tokens = 2000;
-        }
 
         const res = await axios.post(
           "https://api.groq.com/openai/v1/chat/completions",
@@ -482,8 +470,6 @@ async function handleMessage(m) {
     const isGreeted = greetedUsers.has(senderId);
     const baslangic = Date.now();
 
-    await sendTyping(senderId);
-
     const reply = await getGroqReply(text, senderId, isGreeted);
     if (!isGreeted) greetedUsers.set(senderId, Date.now());
     addHistory(senderId, "user", text);
@@ -492,11 +478,7 @@ async function handleMessage(m) {
     // Toplam bekleme 10-22 sn, cevap hazirlama suresi bundan dusulur
     const hedefMs = 10000 + Math.random() * 12000;
     const kalan = Math.max(0, hedefMs - (Date.now() - baslangic));
-    const ilkYari = kalan / 2;
-
-    await sleep(ilkYari);
-    await sendTyping(senderId);
-    await sleep(kalan - ilkYari);
+    await sleep(kalan);
 
     await sendSplitMessages(senderId, reply);
   } catch (e) {
@@ -531,9 +513,9 @@ app.post('/webhook', function (req, res) {
 });
 
 app.get('/', function (req, res) {
-  res.send('Bot Aktif! Aida v43 - Hafiza - Yaziyor Gostergesi - Gecikme');
+  res.send('Bot Aktif! Aida v44');
 });
 
 app.listen(PORT, function () {
-  console.log("Sunucu " + PORT + " portunda... Aida v43 - Hafiza - Yaziyor Gostergesi - Gecikme");
+  console.log("Sunucu " + PORT + " portunda... Aida v44");
 });
