@@ -10,19 +10,42 @@ const IG_ID = process.env.IG_ID || "17841441637097678";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const PORT = process.env.PORT || 10000;
 
+// Ekip sayfadan elle yazinca bot bu sure kadar o musteriye susar
+const HUMAN_PAUSE_MS = 12 * 60 * 60 * 1000;
+// Pes pese gelen mesajlari birlestirme suresi
+const BIRLESTIRME_MS = 4000;
+
 const recentMessages = new Map();
 const greetedUsers = new Map();
 const userContext = new Map();
 const chatHistory = new Map();
-const muayeneSoruldu = new Map();
+const userState = new Map();
 const randevuTalebi = new Map();
 const pending = new Map();
 const processing = new Set();
-
-const BIRLESTIRME_MS = 4000;
+const insanDevraldi = new Map();
+const botMids = new Set();
+const sonGonderilen = new Map();
 
 function sleep(ms) {
   return new Promise(function (r) { setTimeout(r, ms); });
+}
+
+// Turkce karakterleri ASCII'ye cevirip kucuk harfe doner
+function norm(s) {
+  return String(s || "")
+    .replace(/İ/g, "i")
+    .replace(/I/g, "i")
+    .toLowerCase()
+    .replace(/ı/g, "i")
+    .replace(/ş/g, "s")
+    .replace(/ç/g, "c")
+    .replace(/ğ/g, "g")
+    .replace(/ö/g, "o")
+    .replace(/ü/g, "u")
+    .replace(/â/g, "a")
+    .replace(/î/g, "i")
+    .replace(/û/g, "u");
 }
 
 function trTarih(offsetGun) {
@@ -38,6 +61,15 @@ function trTarih(offsetGun) {
 function telefonVarMi(text) {
   const digits = text.replace(/\D/g, "");
   return /5\d{9}/.test(digits);
+}
+
+function getState(id) {
+  let s = userState.get(id);
+  if (!s) {
+    s = { replyCount: 0, lastPush: -10, muayene: false, musaitSon: 0, adresSon: 0, erteleSon: 0 };
+    userState.set(id, s);
+  }
+  return s;
 }
 
 function addHistory(senderId, role, content) {
@@ -72,17 +104,67 @@ function getContext(senderId) {
   return ctx;
 }
 
-function isOnlyEmoji(text) {
-  const trimmed = text.trim();
-  if (!trimmed) return true;
-  return !/[a-zA-Z0-9]/.test(trimmed);
+// ---------- Insan devralma ----------
+
+function anahtar(text) {
+  return String(text || "").replace(/[^\p{L}\p{N}]/gu, "").toLowerCase().slice(0, 60);
 }
 
+function sonGonderilenEkle(id, text) {
+  const l = sonGonderilen.get(id) || [];
+  l.push({ key: anahtar(text), t: Date.now() });
+  while (l.length > 20) l.shift();
+  sonGonderilen.set(id, l);
+}
+
+function botMesajiMi(id, text, mid) {
+  if (mid && botMids.has(mid)) return true;
+  const key = anahtar(text);
+  if (!key) return false;
+  const l = sonGonderilen.get(id) || [];
+  const now = Date.now();
+  return l.some(function (x) { return now - x.t < 5 * 60 * 1000 && x.key === key; });
+}
+
+function insanAktifMi(id) {
+  const bitis = insanDevraldi.get(id);
+  if (!bitis) return false;
+  if (Date.now() > bitis) {
+    insanDevraldi.delete(id);
+    return false;
+  }
+  return true;
+}
+
+function handleEcho(m) {
+  const musteriId = m.recipient && m.recipient.id;
+  if (!musteriId) return;
+  const text = m.message.text || "";
+  if (botMesajiMi(musteriId, text, m.message.mid)) {
+    return;
+  }
+  const zatenAktif = insanAktifMi(musteriId);
+  insanDevraldi.set(musteriId, Date.now() + HUMAN_PAUSE_MS);
+  if (text) addHistory(musteriId, "assistant", text);
+
+  const p = pending.get(musteriId);
+  if (p) {
+    if (p.timer) clearTimeout(p.timer);
+    p.texts.forEach(function (t) { addHistory(musteriId, "user", t); });
+    pending.delete(musteriId);
+  }
+  if (!zatenAktif) {
+    console.log("INSAN DEVRALDI: " + musteriId + " | bot " + Math.round(HUMAN_PAUSE_MS / 3600000) + " saat susacak | " + text.slice(0, 60));
+  }
+}
+
+// ---------- Mesaj gonderme ----------
+
 function splitToMessages(text) {
-  if (!text.includes('.') && !text.includes('!') && !text.includes('?')) {
+  const parts = text.split(/(?<=[.!?]|[.!?]\s?[\p{Extended_Pictographic}\uFE0F]+)\s+(?![\p{Extended_Pictographic}\uFE0F])/u);
+  if (parts.length <= 1) {
     return [text.slice(0, 900)];
   }
-  const parts = text.split(/(?<=[.!?])\s+/);
   let result = [];
   let current = "";
   for (let p of parts) {
@@ -107,11 +189,20 @@ function splitToMessages(text) {
 async function sendSplitMessages(recipientId, text) {
   const msgs = splitToMessages(text);
   for (let i = 0; i < msgs.length; i++) {
-    await axios.post(
+    if (insanAktifMi(recipientId)) {
+      console.log("Insan devraldi, kalan mesajlar iptal");
+      return;
+    }
+    sonGonderilenEkle(recipientId, msgs[i]);
+    const r = await axios.post(
       "https://graph.facebook.com/v20.0/" + IG_ID + "/messages",
       { recipient: { id: recipientId }, message: { text: msgs[i] } },
       { params: { access_token: PAGE_ACCESS_TOKEN } }
     );
+    if (r.data && r.data.message_id) {
+      if (botMids.size > 2000) botMids.clear();
+      botMids.add(r.data.message_id);
+    }
     console.log("Gonderildi [" + (i + 1) + "/" + msgs.length + "]: " + msgs[i]);
     if (i < msgs.length - 1) {
       await sleep(800 + Math.random() * 500);
@@ -119,44 +210,51 @@ async function sendSplitMessages(recipientId, text) {
   }
 }
 
+// ---------- Prompt ----------
+
 const SYSTEM_PROMPT = `Sen GuGu Clinic satis danismani Aida'sin. Alsancak'taki klinikte calisan bir satis danismani gibi konusursun. Samimi ama kurumsal, siz'li, saygili ve net bir dil kullan. Birisi samimi olarak insan mi yoksa yapay zeka mi diye sorarsa dogruyu soyle: "Ben GuGu Clinic'in dijital asistaniyim, detayli gorusme icin 0534 248 94 70'ten ekibimize ulasabilirsiniz." de. Bunu kendiliginden belirtme.
 
 URSLUP:
-- Max 2-3 kisa cumle. Liste, madde, uzun paragraf yok.
-- Her mesaja "yogun oldugunuzu anliyorum, subeyi paylasir misiniz" gibi kalip metinler ekleme.
-- Gun/saat listesini sadece randevu sorulunca ver, fiyat mesajlarina ekleme.
+- Instagram DM yaziyorsun. DUZ METIN yaz: yildiz (*), kalin yazi, madde isareti, numarali liste, baslik KULLANMA.
+- Max 2-3 kisa cumle.
+- Once musterinin sorusunu cevapla. Sorusunu cevaplamadan baska konuya gecme.
+- Bir mesajda EN FAZLA BIR soru sor. Musteri onceki sorunu cevaplamadiysa yeni soru ekleme.
+- Musterinin soyledigi kisitlari (calisma saati, gun, bolge) dikkate al, yok sayip ayni teklifi tekrarlama.
+- Ayni bilgiyi veya ayni soruyu tekrarlama (gun/saat listesi, adres, ucretsiz muayene). Konusma gecmisine bak.
+- Konusma gecmisinde "assistant" mesajlarinin bir kismini klinik ekibi elle yazmis olabilir, o bilgilerle celisme.
+- Gun/saat listesini fiyat mesajlarina ekleme.
 - "Canim" deme, hep "siz" de.
 - Cumle sonlarina ara sira emoji koyabilirsin 😊 ✨ (her cumlede degil).
 
-SATIS VE RANDEVU KURALI (COK ONEMLI):
-- HER cevabin sonuna konusulan konuyla ilgili TEK bir kisa soru ekle ve musteriyi nazikce randevuya yonlendir. (Randevu talebi alindiktan sonra bu kural gecerli degil, asagiya bak.)
-- Soru konuyla alakali olsun. Ornek: dudak konusuluyorsa "Dogal bir gorunum mu yoksa daha belirgin bir dolgunluk mu dusunuyorsunuz?", botox konusuluyorsa "Daha cok hangi bolgedeki cizgiler sizi rahatsiz ediyor?", fiyat soruldugunda "Size uygun bir gun ayarlayalim mi?"
-- Musteriyi ikna et: uygulamayi Dr Ozgen Yildirim'in yaptigini, sonuclarin dogal oldugunu, kampanyalarin ve hediye uygulamalarin oldugunu gerektiginde dogal sekilde hatirlat. Baskici olma, sicak ve guven veren bir dil kullan.
-- Ayni soruyu veya ayni cumleyi arka arkaya tekrarlama. Konusma gecmisine bak.
-- Soru cevabin EN SONUNDA olsun, tek soru isareti kullan.
-- "Ucretsiz muayene" teklifini KENDIN YAPMA. Bu teklifi sistem konusma basina bir kere otomatik ekliyor. Musteri ucretsiz muayeneyi kendisi sorarsa evet ucretsiz muayene yapiyoruz de.
+RANDEVU VE SATIS:
+- Musteriyi ikna etmeye calis ama BASKI YAPMA. Her cevapta randevu isteme.
+- Sistem bilgisinde RandevuTeklifiVer:HAYIR yaziyorsa bu cevapta randevu, gun veya saat SORMA; sadece bilgi ver, gerekirse konuyla ilgili bir soru sor. EVET yaziyorsa nazikce yonlendirebilirsin. Musteri kendisi randevu, gun veya saat konusuyorsa bu kural gecerli degil, akisa devam et.
+- Ikna icin Dr Ozgen Yildirim'in tecrubesini, dogal sonuclari, kampanya ve hediyeleri gerektiginde hatirlat.
+- "Ucretsiz muayene" teklifini KENDIN YAPMA, sistem ekliyor. Musteri sorarsa evet ucretsiz muayene/on gorusme yapiyoruz de ve gun/sube sor.
+- Musteri ertelerse (dusunecegim, sonra yazarim, haberlesiriz, soz veremiyorum vb.) israr ETME. "Tabii, size uygun oldugunuzda yazabilirsiniz, sizi bekliyoruz. 😊" de. Bir daha randevu veya muayene teklif etme.
 
-RANDEVU AKISI (COK ONEMLI):
-- Sen randevuyu sisteme KAYDEDEMEZSIN. "Randevunuz kaydedildi / olusturuldu / ayarlandi" ASLA deme.
-- Gun, saat, sube, isim ve telefon alininca su cumleyi kur: "Talebinizi aldim, ekibimiz sizi arayarak randevunuzu kesinlestirecek. 😊"
-- Eksik bilgiyi sirayla iste: once gun ve sube, sonra saat, sonra isim ve telefon (ikisini tek mesajda iste). Her mesajda sadece eksik olani sor.
-- Musteri isim ve telefonu verdiyse bir daha ISTEME, teyit de isteme.
-- Sadece musaitlik listesindeki gun ve saatlerde randevu oner. Aralik disinda saat isterse nazikce en yakin uygun saati oner. Araligin bitis saatine randevu verme (ornegin Pazartesi 16:30-19:00 araligi icin en gec 18:30 oner).
-- "Yarin, bugun, haftaya" gibi ifadelerde sistem bilgisindeki tarihe bak. O gun musaitlik yoksa bunu soyle ve en yakin uygun gunu oner.
-- Randevu talebi alindiktan sonra (RandevuTalebiAlindi:EVET) tekrar randevu sorusu SORMA, kapanis sorusu ekleme. Sadece yardimci ol (konum, hazirlik, tesekkur) ve "sizi bekliyoruz" de.
+RANDEVU AKISI:
+- Sen randevuyu sisteme KAYDEDEMEZSIN. "Kaydedildi, olusturuldu, ayarlandi, onaylandi" ASLA deme.
+- Sira: 1) Musteriye uygun gun/saat sor veya musaitlige gore oner. 2) Gun, saat ve sube uzerinde ANLASINCA isim ve telefon iste (tek mesajda). 3) Isim ve telefon GELDIKTEN SONRA: "Talebinizi aldim, ekibimiz sizi arayarak randevunuzu kesinlestirecek. 😊"
+- Gun, saat ve sube kesinlesmeden isim ve telefon ISTEME. Isim ve telefon bir kere geldiyse tekrar isteme, teyit de isteme.
+- Musaitlik: Alsancak subesi Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00, Carsamba 16:30-19:00. Alacati/Cesme subesi Persembe 17:00-18:30. Baska gun veya saat YOK.
+- Sadece bu araliklarda oner. Bitis saatine randevu verme (en gec bitisten 30 dakika once oner, ornek Pazartesi en gec 18:30). Musteri aralik disi saat isterse nazikce reddet ve en yakin uygun secenegi oner.
+- Musterinin kisitlari uygun degilse (calisma saati vb.) bunu acikca soyle: "Maalesef bu gunlerde sizin musait oldugunuz saatlerde yerimiz yok." Zorla teklif etme, musteri isterse daha sonra yazabilecegini soyle.
+- Musaitlik listesinin tamamini sadece gerektiginde ve ilk kez ver. Daha once verdiysen sadece ilgili gunu yaz.
+- "Yarin, bugun, haftaya" gibi ifadelerde sistem bilgisindeki tarihe bak. O gun musaitlik yoksa soyle ve en yakin uygun gunu oner.
+- Randevu talebi alindiktan sonra (RandevuTalebiAlindi:EVET) tekrar randevu sorma. Sadece yardimci ol (konum, hazirlik, tesekkur) ve "sizi bekliyoruz" de.
+
+CALISMA SAATI:
+- Randevu ile calisiyoruz. "Saat kaca kadar aciksiniz" gibi sorularda randevu saatlerini soyle (daha once verdiysen ilgili gunu hatirlat), baska soru ekleme.
+
+SUBE:
+- Alsancak ana subemiz. Izmir merkez ve Torbali, Bornova, Buca, Karsiyaka gibi bolgelerden gelenlere Alsancak'i oner. Cesme/Alacati ve cevresinden gelenlere Alacati/Cesme subesini oner. Emin degilsen hangi tarafta olduklarini sor.
 
 ON GORUSME / MUAYENE:
-- Musteri "on gorusme", "muayene", "gorusmek istiyorum" derse ucretsiz on gorusme yaptigimizi soyle ve hemen gun/sube sor.
-
-OTOPARK:
-- Klinigimizin otoparki vardir. Otoparkin ucretli/ucretsiz olmasi, kapasitesi, tam yeri gibi detaylari BILMIYORSUN, uydurma. Detay sorulursa: "Otopark imkanimiz mevcut, detayi randevu teyidinde ekibimiz iletecektir. 😊"
-
-BILGI UYDURMA YASAK:
-- Listede olmayan hicbir bilgiyi (yol tarifi, odeme taksit, uygulama suresi, seans sayisi vb.) uydurma. Emin degilsen: "Bu konuda net bilgiyi randevu teyidinde ekibimiz size iletecektir. 😊" de.
+- Musteri "on gorusme", "muayene", "gorusmek istiyorum" derse ucretsiz on gorusme yaptigimizi soyle ve gun/sube sor.
 
 TANISMA:
-- Sadece ilk selamlamada bir kere: "Merhaba, ben GuGu Clinic'ten Aida." de.
-- Konusma devam ediyorsa tekrar kendini tanitma. Mesaj sadece emoji ise merhaba deme.
+- Sadece ilk selamlamada bir kere: "Merhaba, ben GuGu Clinic'ten Aida." de. Konusma devam ediyorsa tekrar kendini tanitma.
 
 DOKTOR (sadece "doktor mu yapiyor, doktor kim, kim yapiyor, hocamiz kim, tecrubeli mi, uzman mi" diye sorulursa):
 "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir, sonuclarimiz cok dogal olmaktadir." Fiyat sorulunca doktor bilgisi ekleme.
@@ -165,18 +263,22 @@ Doktorun adi tam olarak "Dr Ozgen Yildirim" seklinde yazilir, harf degistirme.
 ADRES (sadece sorulursa):
 "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb 📍"
 
-MUSAITLIK (sadece randevu/musaitlik sorulunca):
-"Su an musaitligimiz Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar?"
+OTOPARK:
+- Klinigimizin otoparki vardir. Ucretli/ucretsiz, kapasite, tam yer gibi detaylari BILMIYORSUN, uydurma. Detay sorulursa: "Otopark imkanimiz mevcut, detayi randevu teyidinde ekibimiz iletecektir. 😊"
+
+MARKALAR VE FIYAT FARKI:
+- Dudak dolgusu: Elasty/Tuscan ve Juvederm. Juvederm daha hacimli, belirgin sonuc icin tercih edilir. Botox: Allergan ve Dysport. Sivi yuz germe: PLLA Eldermafill. Listede olmayan marka SOYLEME.
+- "Elasty ile Juvederm arasinda fiyat farki neden" sorusuna: "Markalarin alis maliyetleri farkli oldugu icin fiyatlar da farkli, ikisi de guvenilir markalardir." de. Icerik, kalicilik gibi teknik karsilastirma uydurma.
+- "Sayfanizda hangi islemler hangi markayla" gibi sorularda yukaridaki bilgileri liste yapmadan 2 cumleyle ozetle.
 
 BOTOX ILE KAS KALDIRMA:
 - Musteri "botox ile kas kaldirma" gibi bir sey sorarsa: "Botox yaparken kaslarin ucundan kaldirma dozu da veriyoruz. 😊"
 
 KAS KALDIRMA / GOZ CEKME (BADEM GOZ):
-- Musteri botoxtan bagimsiz olarak daha fazla cekiklik, goz cekme, goz cekikligi veya kas kaldirma isterse Badem Goz uyguladigimizi soyle: "Badem Goz uyguluyoruz, nakit odemede 18000 TL, KK ile odemede normal fiyat 25000 TL. 😊"
+- Musteri botoxtan bagimsiz olarak daha fazla cekiklik, goz cekme, goz cekikligi veya kas kaldirma isterse: "Badem Goz uyguluyoruz, nakit odemede 18000 TL, KK ile odemede normal fiyat 25000 TL. 😊"
 
 SOMON DNA / PARIS ISILTISI NEDIR:
-- Musteri "Somon DNA nedir", "Paris Isiltisi nedir" diye sorarsa: "Peptit ve amino asit iceren mezoterapi uygulamalaridir. Parilti ve canlilik katar, botoksla harika bir kombindir. ✨"
-- Fiyatini sadece sorarsa soyle.
+- "Peptit ve amino asit iceren mezoterapi uygulamalaridir. Parilti ve canlilik katar, botoksla harika bir kombindir. ✨" Fiyatini sadece sorarsa soyle.
 
 KALICILIK:
 - Dudak dolgusu, nazolabial, goz alti isik dolgusu: 10-12 ay
@@ -198,386 +300,341 @@ FIYATLAR (guncel, sadece sorulan hizmeti soyle, "nakit" kelimesini mutlaka kulla
 - Fiyatlar Alsancak ve Alacati/Cesme subelerinde ayni.
 
 GENEL SORULAR:
-- Musteri listede olmayan genel bir soru sorarsa (cilt bakimi, estetik hakkinda genel merak, nasil yapilir, aci verir mi, kac seans gibi) kendi bilginle dogal ve sicak sekilde 2-3 cumleyle cevap ver, sonra klinige davet et.
+- Listede olmayan genel bir soru sorulursa (cilt bakimi, nasil yapilir, aci verir mi, kac seans gibi) kendi bilginle dogal ve sicak sekilde 2-3 cumleyle cevap ver.
 - Her zaman telefona yonlendirme. Sadece fiyat, kampanya veya tibbi karar gerektiren konularda yonlendir.
 
 SINIRLAR:
-- Listede olmayan FIYAT veya KAMPANYAYI uydurma. Fiyat konusunda emin degilsen: "Guncel fiyat icin 0534 248 94 70'ten ulasabilirsiniz."
+- Listede olmayan FIYAT, MARKA, HIZMET veya KAMPANYAYI uydurma. Fiyat konusunda emin degilsen: "Guncel fiyat icin 0534 248 94 70'ten ulasabilirsiniz."
+- Listede olmayan hicbir bilgiyi (yol tarifi, taksit, uygulama suresi vb.) uydurma. Emin degilsen: "Bu konuda net bilgiyi randevu teyidinde ekibimiz size iletecektir. 😊"
 - Tibbi tavsiye, tani, ilac/hamilelik/alerji gibi saglik sorularinda yorum yapma, doktorumuzla gorusmeye veya telefona yonlendir.
 - "Kesin sonuc", "risksiz", "%100" gibi garanti ifadeleri kullanma.
 - Diger klinikleri kotuleme.
 `;
 
+const LINK = "https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb";
+
 const MUSAITLIK_TAM = "Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 saatleri arasinda var. Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda var. Hangisi size uyar? 😊";
+
+const MUSAITLIK_CESME = "Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda musaitligimiz var. Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 arasinda var. Hangisi size uyar? 😊";
 
 const BADEM_GOZ_CEVAP = "Badem Goz uyguluyoruz, nakit odemede 18000 TL, KK ile odemede normal fiyat 25000 TL. 😊";
 
-// Konusma basina sadece BIR kere eklenir
+// Konusma basina sadece BIR kere
 const MUAYENE_CUMLESI = "Muayene sonrasi size de uygunsa uygulamayi yapabiliriz, ucretsiz muayene randevusu ister misiniz? 😊";
 
-const KAPANIS_SORULARI = {
-  dudak: [
-    "Dogal bir gorunum mu yoksa daha belirgin bir dolgunluk mu dusunuyorsunuz? Size uygun bir gun ayarlayalim mi? 😊",
-    "Dudak formunuzda en cok neyi degistirmek istersiniz? Isterseniz bu hafta icin randevu olusturalim. ✨"
-  ],
-  botox: [
-    "Daha cok hangi bolgedeki cizgiler sizi rahatsiz ediyor? Isterseniz hemen bir randevu olusturalim. 😊",
-    "Botoksu ilk kez mi yaptiracaksiniz? Size uygun bir gun ayarlayalim mi? ✨"
-  ],
-  nazolabial: [
-    "Nazolabial cizgileriniz sizi en cok hangi anlarda rahatsiz ediyor? Size uygun bir gun ayarlayalim mi? 😊"
-  ],
-  gozalti: [
-    "Goz altinda daha cok morluk mu yoksa cokukluk mu var? Isterseniz bir degerlendirme icin randevu olusturalim. 😊"
-  ],
-  sakak: [
-    "Sakaklarinizdaki cokuklugu ne zamandir fark ediyorsunuz? Size uygun bir gun ayarlayalim mi? 😊"
-  ],
-  burun: [
-    "Burunda nasil bir degisiklik dusunuyorsunuz? Isterseniz Hocamizla yuz yuze gorusmek icin randevu olusturalim. 😊"
-  ],
-  ipaski: [
-    "Yuzunuzde en cok hangi bolgenin kalkmasini istiyorsunuz? Size uygun bir gun ayarlayalim mi? ✨"
-  ],
-  siviyuz: [
-    "Yuzunuzde daha cok hangi bolgede sarkma veya hacim kaybi goruyorsunuz? Isterseniz randevu olusturalim. 😊"
-  ],
-  bademgoz: [
-    "Gozunuzde ne kadar bir cekiklik dusunuyorsunuz? Isterseniz Hocamizla gorusmek icin randevu olusturalim. ✨"
-  ],
-  cene: [
-    "Cene hattinizda nasil bir sekil dusunuyorsunuz? Size uygun bir gun ayarlayalim mi? 😊"
-  ],
-  paris: [
-    "Botoksla birlikte yaptirmayi dusunur musunuz? Isterseniz birlikte planlayip randevu olusturalim. ✨"
-  ],
-  doktor: [
-    "Hocamizla yuz yuze gorusup size ozel bir plan olusturmak ister misiniz? Size uygun bir gun ayarlayalim. 😊"
-  ],
-  adres: [
-    "Hangi gun gelmeyi dusunuyorsunuz? Size uygun bir randevu olusturalim. 😊"
-  ],
-  otopark: [
-    "Hangi gun gelmeyi dusunuyorsunuz? Size uygun bir randevu olusturalim. 😊"
-  ],
-  cesme: [
-    "Hangi uygulamayi dusunuyorsunuz? Size uygun bir gun ayarlayalim. 😊"
-  ],
-  genel: [
-    "Hangi uygulamayla ilgileniyorsunuz? Isterseniz size uygun bir gun ayarlayalim. 😊",
-    "Size en uygun uygulamayi birlikte belirleyip randevu olusturalim mi? ✨"
-  ]
+// Sadece konuyla ilgili sorular (randevu istemez)
+const BILGI_SORULARI = {
+  dudak: ["Dogal bir gorunum mu yoksa daha belirgin bir dolgunluk mu dusunuyorsunuz? 😊", "Dudak formunuzda en cok neyi degistirmek istersiniz? ✨"],
+  botox: ["Daha cok hangi bolgedeki cizgiler sizi rahatsiz ediyor? 😊", "Botoksu daha once yaptirdiniz mi? ✨"],
+  nazolabial: ["Nazolabial cizgileriniz sizi en cok hangi anlarda rahatsiz ediyor? 😊"],
+  gozalti: ["Goz altinda daha cok morluk mu yoksa cokukluk mu var? 😊"],
+  sakak: ["Sakaklarinizdaki cokuklugu ne zamandir fark ediyorsunuz? 😊"],
+  burun: ["Burunda nasil bir degisiklik dusunuyorsunuz? 😊"],
+  ipaski: ["Yuzunuzde en cok hangi bolgenin kalkmasini istiyorsunuz? ✨"],
+  siviyuz: ["Yuzunuzde daha cok hangi bolgede sarkma veya hacim kaybi goruyorsunuz? 😊"],
+  bademgoz: ["Gozunuzde ne kadar bir cekiklik dusunuyorsunuz? ✨"],
+  cene: ["Cene hattinizda nasil bir sekil dusunuyorsunuz? 😊"],
+  paris: ["Botoksla birlikte yaptirmayi dusunur musunuz? ✨"],
+  doktor: ["Hangi uygulama icin dusunuyorsunuz? 😊"]
 };
 
-function konuTespit(lower) {
-  if (lower.includes("badem goz") || lower.includes("badem göz")) return "bademgoz";
-  if (lower.includes("dudak")) return "dudak";
-  if (lower.includes("botox") || lower.includes("botoks") || lower.includes("kaz ayagi") || lower.includes("kas arasi")) return "botox";
-  if (lower.includes("nazolab") || lower.includes("nazal")) return "nazolabial";
-  if (lower.includes("goz alti") || lower.includes("gozalti") || lower.includes("isik dolgu")) return "gozalti";
-  if (lower.includes("sakak")) return "sakak";
-  if (lower.includes("burun")) return "burun";
-  if (lower.includes("ip aski") || lower.includes("ip askı")) return "ipaski";
-  if (lower.includes("sivi yuz") || lower.includes("sıvı yüz")) return "siviyuz";
-  if (lower.includes("cene")) return "cene";
-  if (lower.includes("paris") || lower.includes("somon") || lower.includes("genclik")) return "paris";
-  if (lower.includes("doktor") || lower.includes("tecrubeli") || lower.includes("hocamiz") || lower.includes("uzman")) return "doktor";
-  return null;
+// Randevu daveti (3 cevapta bir)
+const RANDEVU_SORULARI = [
+  "Isterseniz size uygun bir gun ayarlayalim mi? 😊",
+  "Dilerseniz Hocamizla yuz yuze gorusmek icin bir gun belirleyelim mi? ✨"
+];
+
+const LOJISTIK_KONULAR = ["adres", "otopark", "cesme"];
+
+function sec(liste) {
+  return liste[Math.floor(Math.random() * liste.length)];
 }
 
-function kapanisSorusu(topic) {
-  const liste = KAPANIS_SORULARI[topic] || KAPANIS_SORULARI.genel;
-  return liste[Math.floor(Math.random() * liste.length)];
+function konuTespit(l) {
+  if (/badem goz/.test(l)) return "bademgoz";
+  if (/dudak/.test(l)) return "dudak";
+  if (/botox|botoks|kaz ayag|kas arasi|\balin\b/.test(l)) return "botox";
+  if (/goz cek|cekiklik|kas kaldir/.test(l)) return "bademgoz";
+  if (/nazolab|nazal/.test(l)) return "nazolabial";
+  if (/goz alti|gozalti|isik dolgu/.test(l)) return "gozalti";
+  if (/sakak/.test(l)) return "sakak";
+  if (/burun/.test(l)) return "burun";
+  if (/ip aski/.test(l)) return "ipaski";
+  if (/sivi yuz|sivi germe/.test(l)) return "siviyuz";
+  if (/\bcene\b/.test(l)) return "cene";
+  if (/paris|somon|genclik/.test(l)) return "paris";
+  if (/doktor|tecrubeli|hocamiz|uzman/.test(l)) return "doktor";
+  return null;
 }
 
 function soruVarMi(text) {
   return /\?[\s\p{Extended_Pictographic}\uFE0F]*$/u.test(text.trim());
 }
 
-function muayeneUygunMu(senderId, topic, reply) {
-  if (muayeneSoruldu.has(senderId)) return false;
-  if (!topic || topic === "genel" || topic === "adres" || topic === "cesme" || topic === "otopark") return false;
-  if (reply.startsWith("Tesekkurler")) return false;
-  if (reply.toLowerCase().includes("muayene")) return false;
-  return true;
+function kisalt(t, max) {
+  if (t.length <= max) return t;
+  const kes = t.slice(0, max);
+  const i = Math.max(kes.lastIndexOf("."), kes.lastIndexOf("!"), kes.lastIndexOf("?"));
+  return (i > 200 ? kes.slice(0, i + 1) : kes).trim();
 }
 
+function nc(text) {
+  return { text: text, noClose: true };
+}
+
+function kalicilikCevap(l, ctx) {
+  const topic = konuTespit(l) || (ctx ? ctx.lastTopic : null);
+  if (topic === "botox") return "Botoks 5-6 aydir, duzenli yaptirdiginizda sure uzuyor. ✨";
+  if (topic === "dudak") return "Dudak dolgumuzun kaliciligi 10-12 ay arasindadir, cok dogal erir. 😊";
+  if (topic === "nazolabial") return "Nazolabial dolgumuz 10-12 ay kalicidir. 😊";
+  if (topic === "gozalti") return "Goz alti isik dolgumuz 10-12 ay kalicidir. 😊";
+  return null;
+}
+
+function musaitlikCevap(s, onek, metin) {
+  // Son 10 dakikada verildiyse tekrar verme, AI devralsin
+  if (Date.now() - s.musaitSon < 10 * 60 * 1000) return null;
+  s.musaitSon = Date.now();
+  return (onek || "") + (metin || MUSAITLIK_TAM);
+}
+
+const FIYAT_NIYETI = /fiyat|ne kadar|nekadar|ucret|\bkac (tl|para|lira)|\bkaca\b|\bkdr\b|\btl\b|kampanya|\bkac\s*[?]*$/;
+
+// ---------- Cevap uretimi ----------
+
 async function getGroqReply(userMessage, senderId, isGreeted) {
-  const lower = userMessage.toLowerCase();
-  const reply = await getReplyInner(userMessage, senderId, isGreeted);
+  const l = norm(userMessage);
+  const s = getState(senderId);
 
-  // Randevu talebi alindiysa kapanis sorusu / muayene teklifi ekleme
-  if (randevuTalebi.has(senderId)) return reply;
+  const raw = await getReplyInner(userMessage, senderId, isGreeted);
+  if (raw === null) return null;
 
-  // Cevap zaten soruyla bitiyorsa veya telefon yonlendirmesiyse dokunma
-  if (soruVarMi(reply) || reply.includes("0534 248")) {
-    return reply;
+  const noClose = typeof raw === "object";
+  const text = noClose ? raw.text : raw;
+  s.replyCount++;
+
+  // Cevap randevu iceriyorsa sayaci guncelle
+  const textNorm = norm(text);
+  if (/randevu|gun ayarla|hangi gun|muayene/.test(textNorm) && soruVarMi(text)) {
+    s.lastPush = s.replyCount;
   }
 
-  const ctx = getContext(senderId);
-  const topic = konuTespit(lower) || (ctx ? ctx.lastTopic : null) || "genel";
+  if (noClose) return text;
+  if (randevuTalebi.has(senderId)) return text;
+  if (Date.now() - s.erteleSon < 24 * 3600 * 1000) return text;
+  if (soruVarMi(text) || text.includes("0534 248") || /talebinizi ald/.test(textNorm)) return text;
 
-  if (muayeneUygunMu(senderId, topic, reply)) {
-    muayeneSoruldu.set(senderId, Date.now());
-    return reply + " " + MUAYENE_CUMLESI;
+  const topic = konuTespit(l);
+  if (!topic || LOJISTIK_KONULAR.indexOf(topic) !== -1) return text;
+
+  const pushSure = (s.replyCount - s.lastPush) >= 3;
+
+  if (pushSure && !s.muayene && topic !== "doktor") {
+    s.muayene = true;
+    s.lastPush = s.replyCount;
+    return text + " " + MUAYENE_CUMLESI;
   }
-
-  return reply + " " + kapanisSorusu(topic);
+  if (pushSure) {
+    s.lastPush = s.replyCount;
+    return text + " " + sec(RANDEVU_SORULARI);
+  }
+  const liste = BILGI_SORULARI[topic];
+  return liste ? text + " " + sec(liste) : text;
 }
 
 async function getReplyInner(userMessage, senderId, isGreeted) {
-  const lower = userMessage.toLowerCase();
+  const l = norm(userMessage);
   const ctx = getContext(senderId);
+  const s = getState(senderId);
   const talepVar = randevuTalebi.has(senderId);
+  const erteleAktif = Date.now() - s.erteleSon < 24 * 3600 * 1000;
 
-  if (isOnlyEmoji(userMessage)) {
-    return "Tesekkurler, her zaman yazabilirsiniz. 😊";
+  // Harf/rakam yoksa (emoji, nokta vb.)
+  if (!/[\p{L}\p{N}]/u.test(userMessage)) {
+    if (!isGreeted && !talepVar) {
+      return nc("Merhaba, ben GuGu Clinic'ten Aida. Size nasil yardimci olabilirim? 😊");
+    }
+    return null;
   }
 
-  const kisaTesekkur = [
-    "cok iyi", "çok iyi", "super", "süper", "harika", "mukemmel", "mükemmel",
-    "cok guzel", "çok güzel", "sahane", "şahane", "tesekkur", "teşekkür",
-    "teşekkürler", "tesekkurler", "tamam", "ok", "okey", "tamamdir",
-    "sagol", "sağol", "eyvallah"
+  // Kisa tesekkur / memnuniyet
+  const tesekkurler = [
+    "tesekkur", "tesekkurler", "tesekkur ederim", "cok tesekkurler", "sagol", "sag ol",
+    "eyvallah", "harika", "super", "mukemmel", "cok iyi", "cok guzel", "sahane",
+    "tamam tesekkurler", "tamam tesekkur ederim"
   ];
-  if (lower.trim().length < 25 && kisaTesekkur.includes(lower.trim())) {
-    return "Tesekkurler, sizi klinigimizde gormekten memnuniyet duyariz. ✨";
+  if (l.trim().length < 25 && tesekkurler.indexOf(l.trim().replace(/[.!\s]+$/, "")) !== -1) {
+    return nc("Cok sevindik, sizi klinigimizde gormekten memnuniyet duyariz. ✨");
   }
 
-  const kasKaldirma = /ka[sş][ıi]?\s*(kald[ıi]r|kald[ıi]rma|yukar)/.test(lower);
-  const gozCekme = /g[oö]z\s*(çekme|cekme|çekik|cekik|kald[ıi]r)/.test(lower) ||
-    lower.includes("çekiklik") || lower.includes("cekiklik") ||
-    lower.includes("çekik") || lower.includes("cekik");
-  const botoxVar = lower.includes("botox") || lower.includes("botoks");
-
-  if (lower.includes("kalici") || lower.includes("kalıc") || lower.includes("kac ay")) {
-    if (ctx && ctx.lastTopic === 'dudak') {
-      return "Dudak dolgumuzun kaliciligi 10-12 ay arasindadir. Cok dogal erir. 😊";
-    }
-    if (ctx && ctx.lastTopic === 'botox') {
-      return "Botoks 5-6 aydir, duzenli yaptirdiginizda sure uzuyor. ✨";
-    }
-    if (ctx && ctx.lastTopic === 'nazolabial') {
-      return "Nazolabial dolgumuz 10-12 ay kalicidir. 😊";
-    }
-    if (ctx && ctx.lastTopic === 'gozalti') {
-      return "Goz alti isik dolgumuz 10-12 ay kalicidir. 😊";
-    }
-    if (lower.includes("dudak") || !lower.includes("botox")) {
-      return "Dudak dolgumuzun kaliciligi 10-12 ay arasindadir, cok dogal erir. 😊";
-    }
-    return "Botoks 5-6 aydir, duzenli yaptirdiginizda sure uzuyor. ✨";
+  // Musteri erteliyor
+  if (
+    !telefonVarMi(userMessage) &&
+    /haberlesel|ben (size )?yazar|ben (size )?yazay|yaziyim|yazayim|dusuneyim|dusunecegim|sonra (yazar|donerim|haber)|simdilik|soz veremiyorum|daha sonra/.test(l)
+  ) {
+    s.erteleSon = Date.now();
+    return nc("Tabii, size uygun oldugunuzda yazabilirsiniz, sizi bekliyoruz. 😊");
   }
 
-  if (lower.includes("otopark")) {
+  // Kalicilik
+  if (/kalici|kac ay|ne kadar dayan|ne kadar kal/.test(l)) {
+    const k = kalicilikCevap(l, ctx);
+    if (k) return k;
+  }
+
+  // Otopark
+  if (/otopark/.test(l)) {
     updateContext(senderId, "otopark");
-    return "Evet, otopark imkanimiz mevcut. Detayi randevu teyidinde ekibimiz iletecektir. 😊";
+    return nc("Evet, otopark imkanimiz mevcut. Detayi randevu teyidinde ekibimiz iletecektir. 😊");
   }
 
-  if (lower.includes("adres") || lower.includes("konum") || lower.includes("nerede")) {
+  // Adres / konum (sadece acik sorularda)
+  if (/\badres|\bkkonum|\bkonum|\byeriniz|neredesiniz|nerdesiniz|\bklinik\w* nerede|nerede kaliyor/.test(l)) {
     updateContext(senderId, "adres");
-    return "Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: https://maps.app.goo.gl/LgQoxVX8gNNtKBUe8?g_st=iwb 📍";
+    const tekrar = Date.now() - s.adresSon < 60 * 60 * 1000;
+    s.adresSon = Date.now();
+    if (tekrar) return nc("Tabii, konum linki tekrar burada: " + LINK + " 📍");
+    return nc("Klinigimiz Dunya Goz Hastanesi'nin arkasinda. Konum: " + LINK + " 📍");
   }
 
-  if (
-    lower.includes("cesme") || lower.includes("çeşme") ||
-    lower.includes("alacati") || lower.includes("alaçatı") ||
-    lower.includes("cesmede") || lower.includes("alacatida") ||
-    lower.includes("alaçatıda")
-  ) {
+  // Cesme / Alacati + randevu
+  if (/cesme|alacati/.test(l)) {
     updateContext(senderId, "cesme");
-    if (
-      !talepVar && (
-        lower.includes("randevu") || lower.includes("ne zaman") ||
-        lower.includes("geliyosunuz") || lower.includes("geliyorsunuz") ||
-        lower.includes("musait") || lower.includes("saat") ||
-        lower.includes("gun") || lower.includes("gün")
-      )
-    ) {
-      return "Alacati/Cesme subemizde Persembe 17:00-18:30 arasinda musaitligimiz var. Alsancak subemizde Cumartesi 13:00-16:00, Pazar 13:00-15:00, Pazartesi 16:30-19:00 ve Carsamba 16:30-19:00 arasinda var. Hangisi size uyar? 😊";
+    if (!talepVar && !erteleAktif && /randevu|ne zaman|geliyosunuz|geliyorsunuz|musait|saat|\bgun\b/.test(l)) {
+      const c = musaitlikCevap(s, "", MUSAITLIK_CESME);
+      if (c) return nc(c);
     }
   }
 
-  if (
-    !talepVar && (
-      lower.includes("acik mi") || lower.includes("acikmi") ||
-      lower.includes("geliyorum") || lower.includes("musait misiniz") ||
-      lower.includes("bugun acik") || lower.includes("ne zaman acik") ||
-      lower.includes("calisiyor")
-    )
-  ) {
-    return "Evet, su an musaitligimiz " + MUSAITLIK_TAM;
+  // Acik mi / calisma saati
+  if (!talepVar && !erteleAktif && /acik mi|acikmi|acik misiniz|aciksiniz|calisma saat|kaca kadar|musait misiniz|bugun acik|calisiyor/.test(l)) {
+    const c = musaitlikCevap(s, "Randevu ile calisiyoruz, su an musaitligimiz ");
+    if (c) return nc(c);
   }
+
+  // Kas kaldirma / goz cekme
+  const botoxVar = /botox|botoks|botuks/.test(l);
+  const kasKaldirma = /\bkas\w* ?(kaldir|yukar)/.test(l);
+  const gozCekme = /goz ?(cekme|cekik|kaldir|yukar)|cekiklik|\bcekik/.test(l);
 
   if (botoxVar && kasKaldirma) {
     updateContext(senderId, "botox");
     return "Botox yaparken kaslarin ucundan kaldirma dozu da veriyoruz. 😊";
   }
-
-  if (
-    lower.includes("badem goz") || lower.includes("badem göz") ||
-    gozCekme || kasKaldirma
-  ) {
+  if (/badem goz/.test(l) || gozCekme || kasKaldirma) {
     updateContext(senderId, "bademgoz");
     return BADEM_GOZ_CEVAP;
   }
 
-  if (lower.includes("dudak")) {
-    updateContext(senderId, "dudak");
-  } else if (
-    lower.includes("botox") || lower.includes("botoks") ||
-    lower.includes("alin") || lower.includes("kaz ayagi") ||
-    lower.includes("kas arasi")
-  ) {
-    updateContext(senderId, "botox");
-  } else if (lower.includes("nazolabial") || lower.includes("nazal")) {
-    updateContext(senderId, "nazolabial");
-  } else if (lower.includes("goz alti") || lower.includes("isik")) {
-    updateContext(senderId, "gozalti");
-  } else if (lower.includes("sakak")) {
-    updateContext(senderId, "sakak");
-  } else if (lower.includes("burun")) {
-    updateContext(senderId, "burun");
-  } else if (lower.includes("ip aski") || lower.includes("ip askı")) {
-    updateContext(senderId, "ipaski");
-  } else if (lower.includes("sivi") || lower.includes("sıvı")) {
-    updateContext(senderId, "siviyuz");
-  }
+  // Konu baglamini guncelle
+  const konu = konuTespit(l);
+  if (konu) updateContext(senderId, konu);
 
-  if (lower.includes("dudak")) {
-    if (
-      lower.includes("fiyat") || lower.includes("ne kad") ||
-      lower.includes("kadr") || lower.includes("kdr") ||
-      lower.includes("ucret") || lower.includes("tl") ||
-      lower.includes("kac") || lower.includes("kaç") ||
-      lower.includes("alacati") || lower.includes("cesme") ||
-      lower.includes("dudak dolgusu")
-    ) {
-      return "Dudak dolgusu 1 cc Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL). Fiyatlarimiz her iki subemizde de ayni. 😊";
-    }
-  }
-
-  if (lower.includes("nazolabial") || lower.includes("nazalobial") || lower.includes("nazolab")) {
-    return "Nazolabial dolgu 1 cc 3800 TL nakit, 5400 TL KK. Normal fiyat. 😊";
-  }
-
-  if (lower.includes("yarim") && (lower.includes("cc") || lower.includes("dudak"))) {
-    return "Evet yarim yapiyoruz. Yarim cc Elasty/Tuscan 2200 TL nakit, Juvederm 3000 TL nakit. 1 cc Elasty 3800 TL KK 5400, Juvederm 5400 TL KK 7800. 😊";
-  }
-
-  if (lower.includes("sakak") && !lower.includes("dudak") && !lower.includes("nazo")) {
-    return "Sakak dolgusu 4500 TL nakit. 😊";
-  }
-
-  if (lower.includes("burun") && lower.includes("dolgu")) {
-    return "Burun dolgusu 5200 TL nakit. 😊";
-  }
-
-  if (
-    (lower.includes("paris") || lower.includes("somon")) &&
-    (lower.includes("nedir") || lower.includes("ne ise yar") ||
-     lower.includes("ne işe yar") || lower.includes("ne demek") ||
-     lower.includes("nasil bir"))
-  ) {
+  // Somon DNA / Paris nedir
+  if (/paris|somon/.test(l) && /nedir|ne ise yar|ne demek|nasil bir|ne icin/.test(l)) {
     return "Peptit ve amino asit iceren mezoterapi uygulamalaridir. Parilti ve canlilik katar, botoksla harika bir kombindir. ✨";
   }
 
-  if (lower.includes("paris") || lower.includes("somon") || lower.includes("genclik")) {
-    return "Paris Isiltisi, Somon DNA ve Genclik Asisi hepsi bir arada 3500 TL nakit kampanya. ✨";
-  }
-
-  if (
-    lower.includes("doktor mu") || lower.includes("doktor kim") ||
-    lower.includes("doktorunuz") || lower.includes("hangi doktor") ||
-    lower.includes("kim yapiyor") || lower.includes("kim yapıyor") ||
-    lower.includes("tecrubeli") || lower.includes("hocamiz kim") ||
-    lower.includes("uzman mi")
-  ) {
+  // Doktor sorusu
+  if (/doktor mu|doktor kim|doktorunuz|hangi doktor|kim yapiyor|kim yapar|tecrubeli|hocamiz kim|uzman mi/.test(l)) {
     return "Tum uygulamalarimizi Hocamiz Dr Ozgen Yildirim yapmaktadir, 36 senenin verdigi tecrubeyle guvenle gelebilirsiniz, eli cok hafiftir. ✨";
   }
 
-  if (lower.includes("goz alti") || lower.includes("isik dolgu") || lower.includes("gozalti")) {
-    return "Goz alti isik dolgusu 5200 TL kampanya, normal 7000 TL. 😊";
-  }
+  // Sabit fiyat cevaplari: sadece fiyat sorulunca veya mesaj cok kisaysa
+  const fiyatIstegi = FIYAT_NIYETI.test(l) || l.trim().split(/\s+/).length <= 4;
 
-  if (lower.includes("cene") && (lower.includes("dolgu") || lower.includes("fiyat") || lower.includes("ne kad"))) {
-    return "Cene dolgusu 3800 TL nakit. 😊";
-  }
-
-  if (lower.includes("radiesse")) return "Radiesse 19000 TL nakit. ✨";
-  if (lower.includes("novuma")) return "Novuma 14000 TL nakit. 😊";
-
-  if (lower.includes("ip aski") || lower.includes("ip askı")) {
-    if (lower.includes("6") && (lower.includes("2 ml") || lower.includes("sivi") || lower.includes("sıvı"))) {
-      return "x6 Adet Ip Aski + 2 ML Sivi Yuz Germe 16000 TL Nakit Odeme Kampanyamiz var. 😊";
+  if (fiyatIstegi) {
+    if ((/sakak|\bsaka\b/.test(l)) && /dudak/.test(l) && /nazol|nazal/.test(l)) {
+      return "Sakak 4500 TL nakit. Nazolabial 1 cc 3800 TL nakit KK 5400. Dudak 1 cc Elasty 3800 TL KK 5400, Juvederm 5400 TL KK 7800. 😊";
     }
-    if (lower.includes("8") && (lower.includes("2 ml") || lower.includes("sivi") || lower.includes("sıvı"))) {
-      return "x8 Adet Ip Aski + 2 ML Sivi Yuz Germe 18000 TL Nakit Odeme Kampanyamiz var. ✨";
+    if (/yarim/.test(l) && /\bcc\b|dudak/.test(l)) {
+      return "Evet yarim yapiyoruz. Yarim cc Elasty/Tuscan 2200 TL nakit, Juvederm 3000 TL nakit. 1 cc Elasty 3800 TL KK 5400, Juvederm 5400 TL KK 7800. 😊";
     }
-    return "Ip Aski 6 adet 16000 TL nakit (KK 22000 TL), 8 adet 18000 TL nakit (KK 25000 TL). Kampanyamiz: x6 Adet + 2 ML Sivi Yuz Germe 16000 TL, x8 Adet + 2 ML Sivi Yuz Germe 18000 TL Nakit. 😊";
-  }
+    if (/dudak/.test(l)) {
+      return "Dudak dolgusu 1 cc Elasty/Tuscan 3800 TL nakit (KK 5400 TL), Juvederm 5400 TL nakit (KK 7800 TL). Fiyatlarimiz her iki subemizde de ayni. 😊";
+    }
+    if (/nazolab|nazal/.test(l)) {
+      return "Nazolabial dolgu 1 cc 3800 TL nakit, 5400 TL KK. Normal fiyat. 😊";
+    }
+    if (/sakak/.test(l) && !/dudak|nazo/.test(l)) {
+      return "Sakak dolgusu 4500 TL nakit. 😊";
+    }
+    if (/burun/.test(l)) {
+      return "Burun dolgusu 5200 TL nakit. 😊";
+    }
+    if (/paris|somon|genclik/.test(l)) {
+      return "Paris Isiltisi, Somon DNA ve Genclik Asisi hepsi bir arada 3500 TL nakit kampanya. ✨";
+    }
+    if (/goz alti|gozalti|isik dolgu/.test(l)) {
+      return "Goz alti isik dolgusu 5200 TL kampanya, normal 7000 TL. 😊";
+    }
+    if (/\bcene\b/.test(l)) {
+      return "Cene dolgusu 3800 TL nakit. 😊";
+    }
+    if (/radiesse/.test(l)) return "Radiesse 19000 TL nakit. ✨";
+    if (/novuma/.test(l)) return "Novuma 14000 TL nakit. 😊";
 
-  if (
-    (lower.includes("sakak") || lower.includes("saka")) &&
-    lower.includes("dudak") &&
-    (lower.includes("nazol") || lower.includes("nazal"))
-  ) {
-    return "Sakak 4500 TL nakit. Nazolabial 1 cc 3800 TL nakit KK 5400. Dudak 1 cc Elasty 3800 TL KK 5400, Juvederm 5400 TL KK 7800. 😊";
-  }
-
-  if (
-    lower.includes("botox") || lower.includes("botoks") ||
-    lower.includes("alin") || lower.includes("kaz ayagi") ||
-    lower.includes("kas arasi")
-  ) {
-    return "Alin, kas arasi ve kaz ayaklarinin yanina ihtiyaca gore burun kenari ve dudak ustu cizgilere kucuk atislar yapiyoruz, toplam 5 bolge. Kaslarin ucundan kaldirma dozu da veriyoruz. Allergan 3800 TL nakit, Dysport 4400 TL nakit, hediye Somon DNA + Paris Isiltisi. ✨";
-  }
-
-  if (
-    lower.includes("sivi yuz") || lower.includes("sıvı yüz") ||
-    (lower.includes("sivi") && lower.includes("germe"))
-  ) {
-    return "Sivi Yuz Germe: 6 ML PLLA Eldermafill marka Sivi Yuzgerme + 5 Bolge Botox + Paris Isiltisi + Somon DNA 21000 TL nakit. ✨";
-  }
-
-  // Randevu talebi alinmadiysa sabit randevu cevaplari calisir, alindiysa AI devralir
-  if (!talepVar) {
-    if (
-      lower.includes("randevu alabilir") || lower.includes("randevu al") ||
-      lower.includes("randevu nasil") ||
-      (lower.includes("randevu") && lower.length < 80)
-    ) {
-      return "Tabii, su an musaitligimiz " + MUSAITLIK_TAM;
+    if (/ip aski/.test(l)) {
+      if (/6/.test(l) && /2 ml|sivi/.test(l)) {
+        return "x6 Adet Ip Aski + 2 ML Sivi Yuz Germe 16000 TL Nakit Odeme Kampanyamiz var. 😊";
+      }
+      if (/8/.test(l) && /2 ml|sivi/.test(l)) {
+        return "x8 Adet Ip Aski + 2 ML Sivi Yuz Germe 18000 TL Nakit Odeme Kampanyamiz var. ✨";
+      }
+      return "Ip Aski 6 adet 16000 TL nakit (KK 22000 TL), 8 adet 18000 TL nakit (KK 25000 TL). Kampanyamiz: x6 Adet + 2 ML Sivi Yuz Germe 16000 TL, x8 Adet + 2 ML Sivi Yuz Germe 18000 TL Nakit. 😊";
+    }
+    if (botoxVar || /kaz ayag|kas arasi|\balin\b/.test(l)) {
+      return "Alin, kas arasi ve kaz ayaklarinin yanina ihtiyaca gore burun kenari ve dudak ustu cizgilere kucuk atislar yapiyoruz, toplam 5 bolge. Kaslarin ucundan kaldirma dozu da veriyoruz. Allergan 3800 TL nakit, Dysport 4400 TL nakit, hediye Somon DNA + Paris Isiltisi. ✨";
+    }
+    if (/sivi yuz|sivi germe/.test(l)) {
+      return "Sivi Yuz Germe: 6 ML PLLA Eldermafill marka Sivi Yuzgerme + 5 Bolge Botox + Paris Isiltisi + Somon DNA 21000 TL nakit. ✨";
     }
   }
 
+  // Kisa randevu istegi: ilk seferde musaitlik, sonra AI
+  if (
+    !talepVar && !erteleAktif &&
+    /randevu/.test(l) && l.length < 80 &&
+    !/iptal|degistir|ertele/.test(l)
+  ) {
+    const c = musaitlikCevap(s, "Tabii, su an musaitligimiz ");
+    if (c) return nc(c);
+  }
+
+  // ----- AI -----
   try {
     const models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
     for (const model of models) {
       try {
+        const pushSure = (s.replyCount - s.lastPush) >= 3;
+        const randevuBayrak = (talepVar || erteleAktif || !pushSure)
+          ? "HAYIR - bu cevapta kendin randevu/gun/saat teklif etme (musteri kendisi konusuyorsa akisa devam et)"
+          : "EVET";
+
         const systemContent =
           SYSTEM_PROMPT +
           "\nGreeted:" + (isGreeted ? "EVET - merhaba deme" : "HAYIR") +
           " LastTopic:" + (ctx ? ctx.lastTopic : "yok") +
-          " UcretsizMuayeneTeklifEdildi:" + (muayeneSoruldu.has(senderId) ? "EVET - tekrar etme" : "HAYIR") +
-          " RandevuTalebiAlindi:" + (talepVar ? "EVET - tekrar randevu sorma, kapanis sorusu ekleme" : "HAYIR") +
-          " Bugun: " + trTarih(0) + ". Yarin: " + trTarih(1) + ".";
+          " UcretsizMuayeneTeklifEdildi:" + (s.muayene ? "EVET - tekrar etme" : "HAYIR") +
+          " RandevuTalebiAlindi:" + (talepVar ? "EVET - tekrar randevu sorma" : "HAYIR") +
+          " MusterErteledi:" + (erteleAktif ? "EVET - israr etme" : "HAYIR") +
+          " MusaitlikListesiDahaOnceVerildi:" + (Date.now() - s.musaitSon < 30 * 60 * 1000 ? "EVET - tamamini tekrarlama" : "HAYIR") +
+          " RandevuTeklifiVer:" + randevuBayrak +
+          ". Bugun: " + trTarih(0) + ". Yarin: " + trTarih(1) + ".";
 
         const messages = [{ role: "system", content: systemContent }]
           .concat(getHistory(senderId))
           .concat([{ role: "user", content: userMessage }]);
 
-        const reqBody = {
-          model: model,
-          messages: messages,
-          temperature: 0.6,
-          max_tokens: 2000,
-          reasoning_effort: "low"
-        };
-
         const res = await axios.post(
           "https://api.groq.com/openai/v1/chat/completions",
-          reqBody,
+          {
+            model: model,
+            messages: messages,
+            temperature: 0.6,
+            max_tokens: 2000,
+            reasoning_effort: "low"
+          },
           {
             headers: {
               'Authorization': 'Bearer ' + GROQ_API_KEY,
@@ -589,11 +646,16 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
         let text = res.data.choices[0].message.content;
         if (text && text.trim()) {
           console.log("Groq calisti: " + model);
-          text = text.replace(/1988.*?(mezunu|Ege).*?/gi, "");
+          // Instagram markdown gostermez: temizle
+          text = text
+            .replace(/\*\*/g, "")
+            .replace(/__/g, "")
+            .replace(/^\s*[-•*]\s+/gm, "")
+            .replace(/\s*\n+\s*/g, " ");
           if (isGreeted) {
             text = text.replace(/Merhaba, ben GuGu Clinic'ten Aida\.?\s*/gi, "");
           }
-          return text.slice(0, 800).trim();
+          return kisalt(text.trim(), 800);
         }
         console.log("Groq bos cevap: " + model);
       } catch (e) {
@@ -604,11 +666,12 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
     }
     throw new Error("kapali");
   } catch (err) {
-    return "Bu konuda detayli bilgi icin 0534 248 94 70'ten arayabilirsiniz. 😊";
+    return nc("Bu konuda detayli bilgi icin 0534 248 94 70'ten arayabilirsiniz. 😊");
   }
 }
 
-// Pes pese gelen mesajlari birlestirip tek cevap verir
+// ---------- Mesaj isleme ----------
+
 async function processBatch(senderId) {
   const p = pending.get(senderId);
   if (!p) return;
@@ -619,6 +682,12 @@ async function processBatch(senderId) {
   }
 
   pending.delete(senderId);
+
+  if (insanAktifMi(senderId)) {
+    p.texts.forEach(function (t) { addHistory(senderId, "user", t); });
+    return;
+  }
+
   processing.add(senderId);
 
   try {
@@ -628,7 +697,6 @@ async function processBatch(senderId) {
     const ctxNow = getContext(senderId);
     console.log("Gelen Mesaj: " + text + " | Context: " + (ctxNow ? ctxNow.lastTopic : "yok"));
 
-    // Telefon numarasi geldiyse randevu talebi olarak isaretle
     if (telefonVarMi(text)) {
       randevuTalebi.set(senderId, Date.now());
       console.log("YENI RANDEVU TALEBI: " + senderId + " | " + text);
@@ -636,16 +704,29 @@ async function processBatch(senderId) {
 
     const isGreeted = greetedUsers.has(senderId);
     const reply = await getGroqReply(text, senderId, isGreeted);
+
+    if (!reply) {
+      addHistory(senderId, "user", text);
+      console.log("Cevap verilmedi (emoji/nokta)");
+      return;
+    }
+
     if (!isGreeted) greetedUsers.set(senderId, Date.now());
-    addHistory(senderId, "user", text);
-    addHistory(senderId, "assistant", reply);
 
     // Ilk mesajdan itibaren toplam 6-12 sn
     const hedefMs = 6000 + Math.random() * 6000;
     const kalan = Math.max(0, hedefMs - (Date.now() - baslangic));
     await sleep(kalan);
 
+    if (insanAktifMi(senderId)) {
+      console.log("Insan devraldi, bot cevabi iptal edildi");
+      addHistory(senderId, "user", text);
+      return;
+    }
+
     await sendSplitMessages(senderId, reply);
+    addHistory(senderId, "user", text);
+    addHistory(senderId, "assistant", reply);
   } catch (e) {
     console.log("Mesaj isleme hatasi: " + e.message);
   } finally {
@@ -656,8 +737,9 @@ async function processBatch(senderId) {
 function handleMessage(m) {
   try {
     if (!m || !m.message) return;
+
     if (m.message.is_echo) {
-      console.log("Echo atlandi: " + (m.message.text || "").slice(0, 80));
+      handleEcho(m);
       return;
     }
     if (!m.message.text) return;
@@ -667,6 +749,12 @@ function handleMessage(m) {
 
     if (isDuplicate(senderId, text)) {
       console.log("Duplicate atlandi");
+      return;
+    }
+
+    if (insanAktifMi(senderId)) {
+      console.log("Insan aktif, bot sessiz: " + text.slice(0, 60));
+      addHistory(senderId, "user", text);
       return;
     }
 
@@ -709,9 +797,9 @@ app.post('/webhook', function (req, res) {
 });
 
 app.get('/', function (req, res) {
-  res.send('Bot Aktif! Aida v47');
+  res.send('Bot Aktif! Aida v48');
 });
 
 app.listen(PORT, function () {
-  console.log("Sunucu " + PORT + " portunda... Aida v47");
+  console.log("Sunucu " + PORT + " portunda... Aida v48");
 });
