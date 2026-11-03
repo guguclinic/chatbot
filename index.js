@@ -10,8 +10,8 @@ const IG_ID = process.env.IG_ID || "17841441637097678";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const PORT = process.env.PORT || 10000;
 
-// Ekip sayfadan elle yazinca bot bu sure kadar o musteriye susar
-const HUMAN_PAUSE_MS = 12 * 60 * 60 * 1000;
+// Ekip sayfadan elle yazinca bot bu sure kadar o musteriye susar (musteriye ozel)
+const HUMAN_PAUSE_MS = 15 * 60 * 1000;
 // Pes pese gelen mesajlari birlestirme suresi
 const BIRLESTIRME_MS = 4000;
 
@@ -56,6 +56,24 @@ function trTarih(offsetGun) {
     day: 'numeric',
     month: 'long'
   });
+}
+
+const GUN_KURAL = {
+  Mon: "Alsancak 16:30-19:00",
+  Wed: "Alsancak 16:30-19:00",
+  Thu: "Alacati/Cesme 17:00-18:30",
+  Sat: "Alsancak 13:00-16:00",
+  Sun: "Alsancak 13:00-15:00"
+};
+
+function takvimMetni() {
+  const satir = [];
+  for (let i = 0; i < 15; i++) {
+    const d = new Date(Date.now() + i * 86400000);
+    const kisa = d.toLocaleDateString('en-US', { timeZone: 'Europe/Istanbul', weekday: 'short' });
+    if (GUN_KURAL[kisa]) satir.push(trTarih(i) + " = " + GUN_KURAL[kisa]);
+  }
+  return satir.join("; ");
 }
 
 function telefonVarMi(text) {
@@ -107,7 +125,11 @@ function getContext(senderId) {
 // ---------- Insan devralma ----------
 
 function anahtar(text) {
-  return String(text || "").replace(/[^\p{L}\p{N}]/gu, "").toLowerCase().slice(0, 60);
+  return String(text || "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, "")
+    .toLowerCase()
+    .slice(0, 60);
 }
 
 function sonGonderilenEkle(id, text) {
@@ -154,7 +176,7 @@ function handleEcho(m) {
     pending.delete(musteriId);
   }
   if (!zatenAktif) {
-    console.log("INSAN DEVRALDI: " + musteriId + " | bot " + Math.round(HUMAN_PAUSE_MS / 3600000) + " saat susacak | " + text.slice(0, 60));
+    console.log("INSAN DEVRALDI: " + musteriId + " | bot " + Math.round(HUMAN_PAUSE_MS / 60000) + " dakika susacak | " + text.slice(0, 60));
   }
 }
 
@@ -226,6 +248,12 @@ URSLUP:
 - "Canim" deme, hep "siz" de.
 - Cumle sonlarina ara sira emoji koyabilirsin 😊 ✨ (her cumlede degil).
 
+CEVAP KURALLARI:
+- Musteri bir sey sorarsa (marka, fiyat, sure) ILK cumlede dogrudan cevabi ver. Ornek: "PLLA'nin markasi ne" -> "Eldermafill markasini kullaniyoruz."
+- Sonuc vaadi icin "saglar" yerine "destekler" de.
+- "Baska sorunuz var mi", "yardimci olmaktan memnuniyet duyarim" gibi kapanis cumleleri KULLANMA. Konuyla ilgili tek kisa soru sor veya soru sormadan bitir.
+- Musteri daha once baska bir dolgu, PLLA veya botox yaptirdigini soylerse uygunlugu Hocamizin muayenede degerlendirecegini soyle, onaylama veya onerme.
+
 RANDEVU VE SATIS:
 - Musteriyi ikna etmeye calis ama BASKI YAPMA. Her cevapta randevu isteme.
 - Sistem bilgisinde RandevuTeklifiVer:HAYIR yaziyorsa bu cevapta randevu, gun veya saat SORMA; sadece bilgi ver, gerekirse konuyla ilgili bir soru sor. EVET yaziyorsa nazikce yonlendirebilirsin. Musteri kendisi randevu, gun veya saat konusuyorsa bu kural gecerli degil, akisa devam et.
@@ -241,8 +269,13 @@ RANDEVU AKISI:
 - Sadece bu araliklarda oner. Bitis saatine randevu verme (en gec bitisten 30 dakika once oner, ornek Pazartesi en gec 18:30). Musteri aralik disi saat isterse nazikce reddet ve en yakin uygun secenegi oner.
 - Musterinin kisitlari uygun degilse (calisma saati vb.) bunu acikca soyle: "Maalesef bu gunlerde sizin musait oldugunuz saatlerde yerimiz yok." Zorla teklif etme, musteri isterse daha sonra yazabilecegini soyle.
 - Musaitlik listesinin tamamini sadece gerektiginde ve ilk kez ver. Daha once verdiysen sadece ilgili gunu yaz.
-- "Yarin, bugun, haftaya" gibi ifadelerde sistem bilgisindeki tarihe bak. O gun musaitlik yoksa soyle ve en yakin uygun gunu oner.
+- "Yarin, bugun, haftaya" gibi ifadelerde sistem bilgisindeki tarihe ve takvime bak. O gun musaitlik yoksa soyle ve en yakin uygun gunu oner.
 - Randevu talebi alindiktan sonra (RandevuTalebiAlindi:EVET) tekrar randevu sorma. Sadece yardimci ol (konum, hazirlik, tesekkur) ve "sizi bekliyoruz" de.
+
+RANDEVU ORNEKLERI (bu sirayi aynen izle):
+- Musteri: "carsamba yarin icin mu" -> "Evet, yarin Carsamba Alsancak subemizde 16:30-19:00 arasi musaitiz. Hangi saat size uygun? 😊" (isim/telefon ISTEME, once saat)
+- Musteri: "17:30 olur" -> "17:30 uygun. Isminizi ve telefon numaranizi alabilir miyim? 😊"
+- Musteri sube belirtmeden bir gun sorarsa o gunun hangi subede musait oldugunu ve digerinde olmadigini birlikte soyle, en yakin alternatif tarihi (takvimden) oner.
 
 CALISMA SAATI:
 - Randevu ile calisiyoruz. "Saat kaca kadar aciksiniz" gibi sorularda randevu saatlerini soyle (daha once verdiysen ilgili gunu hatirlat), baska soru ekleme.
@@ -360,7 +393,7 @@ function konuTespit(l) {
   if (/sakak/.test(l)) return "sakak";
   if (/burun/.test(l)) return "burun";
   if (/ip aski/.test(l)) return "ipaski";
-  if (/sivi yuz|sivi germe/.test(l)) return "siviyuz";
+  if (/sivi yuz|sivi germe|plla/.test(l)) return "siviyuz";
   if (/\bcene\b/.test(l)) return "cene";
   if (/paris|somon|genclik/.test(l)) return "paris";
   if (/doktor|tecrubeli|hocamiz|uzman/.test(l)) return "doktor";
@@ -423,8 +456,10 @@ async function getGroqReply(userMessage, senderId, isGreeted) {
   if (randevuTalebi.has(senderId)) return text;
   if (Date.now() - s.erteleSon < 24 * 3600 * 1000) return text;
   if (soruVarMi(text) || text.includes("0534 248") || /talebinizi ald/.test(textNorm)) return text;
+  if (/randevu|bekliyoruz|telefon|saat/.test(textNorm)) return text;
 
-  const topic = konuTespit(l);
+  const ctxSon = getContext(senderId);
+  const topic = konuTespit(l) || (ctxSon ? ctxSon.lastTopic : null);
   if (!topic || LOJISTIK_KONULAR.indexOf(topic) !== -1) return text;
 
   const pushSure = (s.replyCount - s.lastPush) >= 3;
@@ -489,7 +524,7 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
   }
 
   // Adres / konum (sadece acik sorularda)
-  if (/\badres|\bkkonum|\bkonum|\byeriniz|neredesiniz|nerdesiniz|\bklinik\w* nerede|nerede kaliyor/.test(l)) {
+  if (/\badres|\bkonum|\byeriniz|neredesiniz|nerdesiniz|\bklinik\w* nerede|nerede kaliyor/.test(l)) {
     updateContext(senderId, "adres");
     const tekrar = Date.now() - s.adresSon < 60 * 60 * 1000;
     s.adresSon = Date.now();
@@ -620,7 +655,8 @@ async function getReplyInner(userMessage, senderId, isGreeted) {
           " MusterErteledi:" + (erteleAktif ? "EVET - israr etme" : "HAYIR") +
           " MusaitlikListesiDahaOnceVerildi:" + (Date.now() - s.musaitSon < 30 * 60 * 1000 ? "EVET - tamamini tekrarlama" : "HAYIR") +
           " RandevuTeklifiVer:" + randevuBayrak +
-          ". Bugun: " + trTarih(0) + ". Yarin: " + trTarih(1) + ".";
+          ". Bugun: " + trTarih(0) + ". Yarin: " + trTarih(1) + "." +
+          " Onumuzdeki 2 haftanin musait gunleri (bunlarin disinda gun YOK, tarihleri aynen kullan): " + takvimMetni() + ".";
 
         const messages = [{ role: "system", content: systemContent }]
           .concat(getHistory(senderId))
@@ -752,6 +788,12 @@ function handleMessage(m) {
       return;
     }
 
+    // Insan sohbetinde bile telefon numarasi gelirse talep olarak kaydet
+    if (telefonVarMi(text) && !randevuTalebi.has(senderId)) {
+      randevuTalebi.set(senderId, Date.now());
+      console.log("YENI RANDEVU TALEBI (insan sohbeti): " + senderId + " | " + text);
+    }
+
     if (insanAktifMi(senderId)) {
       console.log("Insan aktif, bot sessiz: " + text.slice(0, 60));
       addHistory(senderId, "user", text);
@@ -797,9 +839,9 @@ app.post('/webhook', function (req, res) {
 });
 
 app.get('/', function (req, res) {
-  res.send('Bot Aktif! Aida v48');
+  res.send('Bot Aktif! Aida v49');
 });
 
 app.listen(PORT, function () {
-  console.log("Sunucu " + PORT + " portunda... Aida v48");
+  console.log("Sunucu " + PORT + " portunda... Aida v49");
 });
